@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { useState, useId, useEffect, useCallback, useRef } from "react";
 import MusicToggle from "./MusicToggle";
 import Link from "next/link";
+import SceneTimePanel from "./SceneTimePanel";
 
 const OceanCanvas = dynamic(() => import("@/components/OceanCavas"), {
   ssr: false,
@@ -11,6 +12,25 @@ const OceanCanvas = dynamic(() => import("@/components/OceanCavas"), {
 });
 
 const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+
+function getDisplayDate(timeOverrideHour: number | null, baseDate: Date) {
+  if (timeOverrideHour === null) {
+    return baseDate;
+  }
+
+  const nextDate = new Date(baseDate);
+  const wholeHours = Math.floor(timeOverrideHour);
+  const minutes = Math.round((timeOverrideHour - wholeHours) * 60);
+  nextDate.setHours(wholeHours, minutes, 0, 0);
+  return nextDate;
+}
+
+function formatTimeLabel(date: Date) {
+  return `${date.getHours().toString().padStart(2, "0")}:${date
+    .getMinutes()
+    .toString()
+    .padStart(2, "0")}`;
+}
 
 function WaitlistForm({
   placeholder,
@@ -213,21 +233,38 @@ function WaitlistForm({
 
 export default function WaitlistPage() {
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
+  const [timeOverrideHour, setTimeOverrideHour] = useState<number | null>(null);
+  const [clockNow, setClockNow] = useState(() => new Date());
 
   useEffect(() => {
     setCurrentYear(new Date().getFullYear());
   }, []);
 
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setClockNow(new Date());
+    }, 1_000);
+
+    return () => window.clearInterval(intervalId);
+  }, []);
+
+  const displayedSceneTime = formatTimeLabel(getDisplayDate(timeOverrideHour, clockNow));
+
   return (
     <>
-      <OceanCanvas />
+      <OceanCanvas timeOverrideHour={timeOverrideHour} />
       <div className="fixed inset-0 z-10 pointer-events-none ocean-veil" />
 
       <nav className="fixed min-w-[320px] top-0 inset-x-0 z-20 flex justify-between items-center px-10 py-8 animate-fade-down">
         <span className="font-display text-[0.92rem] font-bold tracking-[0.28em] uppercase text-[#0BC6B4] text-ocean">
           DeepWave
         </span>
-        <MusicToggle />
+        <div className="flex items-center gap-3">
+          <div className="rounded-full border border-white/15 bg-[#03131f]/55 px-4 py-2 font-mono text-[0.75rem] tracking-[0.18em] text-[#ccecff] backdrop-blur-md">
+            {displayedSceneTime}
+          </div>
+          <MusicToggle />
+        </div>
       </nav>
 
       <main className="fixed min-w-[320px] inset-0 z-20 flex flex-col items-center justify-center px-6 text-center pointer-events-none">
@@ -271,6 +308,7 @@ export default function WaitlistPage() {
           </p>
         </div>
       </footer>
+      <SceneTimePanel value={timeOverrideHour} onChange={setTimeOverrideHour} />
     </>
   );
 }

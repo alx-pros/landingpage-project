@@ -5,7 +5,7 @@ import { useFrame } from "@react-three/fiber";
 import { useTexture } from "@react-three/drei";
 import { Water } from "three/examples/jsm/objects/Water.js";
 import * as THREE from "three";
-import { sceneParams } from "./sceneParams";
+import { getSceneDate, sceneParams } from "./sceneParams";
 import { getSceneSnapshot, vecFromSpherical, type SceneSnapshot } from "./timeUtils";
 
 function updateWaterMaterial(
@@ -22,7 +22,7 @@ function updateWaterMaterial(
   uniforms["alpha"].value = scene.waterAlpha;
   uniforms["waterColor"].value.setHex(scene.waterColorHex);
   uniforms["sunDirection"].value.copy(sunDir);
-  uniforms["sunColor"].value.setHex(scene.sunColorHex);
+  uniforms["sunColor"].value.setHex(scene.sunColorHex).multiplyScalar(scene.sunReflectionIntensity);
 }
 
 export default function Ocean() {
@@ -36,7 +36,7 @@ export default function Ocean() {
   }, [waterNormals]);
 
   const water = useMemo(() => {
-    const scene = getSceneSnapshot(new Date(), sceneParams.location);
+    const scene = getSceneSnapshot(getSceneDate(), sceneParams.location);
     return new Water(geometry, {
       textureWidth: 512,
       textureHeight: 512,
@@ -53,7 +53,7 @@ export default function Ocean() {
   const _sunDir = useRef(new THREE.Vector3());
 
   useFrame((_, delta) => {
-    const scene = getSceneSnapshot(new Date(), sceneParams.location);
+    const scene = getSceneSnapshot(getSceneDate(), sceneParams.location);
     const step = Math.min(delta, 1 / 30);
 
     vecFromSpherical(scene.sunElev, scene.sunAz, _sunDir.current);

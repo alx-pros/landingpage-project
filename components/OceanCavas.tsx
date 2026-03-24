@@ -6,6 +6,7 @@ import { useProgress } from "@react-three/drei";
 import * as THREE from "three";
 import OceanScene from "./scene/OceanScene";
 import { AnimatePresence, motion } from "framer-motion";
+import { setSceneTimeOverride } from "./scene/sceneParams";
 
 function SceneLoadingOverlay() {
   const { active, progress } = useProgress();
@@ -90,7 +91,15 @@ function SceneLoadingOverlay() {
   );
 }
 
-export default function OceanCanvas() {
+export default function OceanCanvas({
+  timeOverrideHour = null,
+}: {
+  timeOverrideHour?: number | null;
+}) {
+  useEffect(() => {
+    setSceneTimeOverride(timeOverrideHour);
+  }, [timeOverrideHour]);
+
   return (
     <>
       <Canvas

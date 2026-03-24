@@ -37,6 +37,11 @@ export interface SceneSnapshot extends SunMoonPosition {
   waterSize: number;
   waterAlpha: number;
   waterTimeScale: number;
+  sunReflectionIntensity: number;
+  sunCoreScale: number;
+  sunHaloScale: number;
+  sunHaloOpacity: number;
+  sunGlowColorHex: number;
   bloomStrength: number;
   bloomRadius: number;
   bloomThreshold: number;
@@ -313,6 +318,42 @@ export function getSceneSnapshot(
     nightFactor
   );
 
+  const sunReflectionIntensity = blendScalar(
+    sceneConfig.sun.dayReflectionIntensity,
+    sceneConfig.sun.twilightReflectionIntensity,
+    sceneConfig.sun.nightReflectionIntensity,
+    noonFactor,
+    twilightFactor,
+    nightFactor
+  );
+
+  const sunCoreScale = blendScalar(
+    sceneConfig.sun.dayCoreScale,
+    sceneConfig.sun.twilightCoreScale,
+    sceneConfig.sun.nightCoreScale,
+    noonFactor,
+    twilightFactor,
+    nightFactor
+  );
+
+  const sunHaloScale = blendScalar(
+    sceneConfig.sun.dayHaloScale,
+    sceneConfig.sun.twilightHaloScale,
+    sceneConfig.sun.nightHaloScale,
+    noonFactor,
+    twilightFactor,
+    nightFactor
+  );
+
+  const sunHaloOpacity = blendScalar(
+    sceneConfig.sun.dayHaloOpacity,
+    sceneConfig.sun.twilightHaloOpacity,
+    sceneConfig.sun.nightHaloOpacity,
+    noonFactor,
+    twilightFactor,
+    nightFactor
+  );
+
   const bloomStrength = blendScalar(
     sceneConfig.bloom.dayStrength,
     sceneConfig.bloom.twilightStrength,
@@ -402,6 +443,18 @@ export function getSceneSnapshot(
     waterSize: sceneConfig.water.size,
     waterAlpha,
     waterTimeScale: sceneConfig.water.timeScale,
+    sunReflectionIntensity,
+    sunCoreScale,
+    sunHaloScale,
+    sunHaloOpacity,
+    sunGlowColorHex: blendHex(
+      sceneConfig.colors.sunGlowDay,
+      sceneConfig.colors.sunGlowTwilight,
+      sceneConfig.colors.sunGlowNight,
+      noonFactor,
+      twilightFactor,
+      nightFactor
+    ),
     bloomStrength,
     bloomRadius,
     bloomThreshold: sceneConfig.bloom.threshold,

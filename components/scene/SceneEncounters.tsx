@@ -6,7 +6,7 @@ import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 
 type FloatingType = 'bottle' | 'buoy' | 'crate'
-type HorizonType = 'island' | 'cliff' | 'seaStack'
+type HorizonType = 'island'
 type CreatureType = 'turtle' | 'dolphin' | 'fishSchool'
 
 interface EncounterSet {
@@ -50,7 +50,7 @@ function getRandomValues(count: number) {
 
 function createEncounterSet(): EncounterSet {
   const floating: FloatingType[] = ['bottle', 'buoy', 'crate']
-  const horizon: HorizonType[] = ['island', 'cliff', 'seaStack']
+  const horizon: HorizonType[] = ['island']
   const creature: CreatureType[] = ['turtle', 'dolphin', 'fishSchool']
   const values = getRandomValues(5)
 
@@ -301,14 +301,14 @@ export default function SceneEncounters() {
 
       {encounter.horizon === 'island' && (
         <HorizonEncounter
-          url="/models/horizon-island.glb"
+          url="/models/promontory.glb"
           angle={encounter.horizonAngle}
           radius={980}
           y={-6}
           scale={1}
         />
       )}
-      {encounter.horizon === 'cliff' && (
+{/*       {encounter.horizon === 'cliff' && (
         <HorizonEncounter
           url="/models/horizon-cliff.glb"
           angle={encounter.horizonAngle}
@@ -327,7 +327,7 @@ export default function SceneEncounters() {
         />
       )}
 
-      {encounter.creature === 'turtle' && (
+ */}      {encounter.creature === 'turtle' && (
         <TurtleEncounter phase={encounter.creaturePhase} radius={encounter.creatureRadius} />
       )}
       {encounter.creature === 'dolphin' && (
@@ -343,9 +343,9 @@ export default function SceneEncounters() {
 useGLTF.preload('/models/floating-bottle.glb')
 useGLTF.preload('/models/floating-buoy.glb')
 useGLTF.preload('/models/floating-crate.glb')
-useGLTF.preload('/models/horizon-island.glb')
-useGLTF.preload('/models/horizon-cliff.glb')
+useGLTF.preload('/models/promontory.glb')
+/* useGLTF.preload('/models/horizon-cliff.glb')
 useGLTF.preload('/models/horizon-sea-stack.glb')
-useGLTF.preload('/models/creature-turtle.glb')
+ */useGLTF.preload('/models/creature-turtle.glb')
 useGLTF.preload('/models/creature-dolphin.glb')
 useGLTF.preload('/models/creature-fish-school.glb')
