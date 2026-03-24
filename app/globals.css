@@ -1,26 +1,65 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* ── Remove the default Next.js white background variables entirely.
+      The canvas background is the 3-D scene; body must be ink-dark
+      so nothing bleeds through the semi-transparent water mesh. ── */
+
+@custom-variant dark (&:where(.dark, .dark *));
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@theme {
+  --color-ink:  #03070f;
+  --color-glow: #5ef0c8;
+  --color-gold: #e8c97a;
+
+  --font-display: var(--font-baskerville);
+  --font-body:    var(--font-cormorant);
+
+  --animate-fade-up:   fadeUp   0.9s ease                        both;
+  --animate-fade-down: fadeDown 1s   ease                        both;
+  --animate-rise-in:   riseIn   1.2s cubic-bezier(0.16,1,0.3,1) both;
+  --animate-pulse-dot: pulseDot 2.5s ease                        infinite;
+}
+
+@keyframes fadeUp   { from { opacity:0; transform:translateY(16px)  } to { opacity:1; transform:translateY(0) } }
+@keyframes fadeDown { from { opacity:0; transform:translateY(-16px) } to { opacity:1; transform:translateY(0) } }
+@keyframes riseIn   { from { opacity:0; transform:translateY(24px)  } to { opacity:1; transform:translateY(0) } }
+@keyframes pulseDot { 0%,100% { opacity:1;   transform:scale(1)    } 50% { opacity:.4; transform:scale(.65) } }
+@keyframes musicBars {
+  0%, 100% { transform: scaleY(.55); opacity: .66; }
+  50% { transform: scaleY(1); opacity: 1; }
+}
+
+@layer utilities {
+  .ocean-veil {
+    background:
+      radial-gradient(ellipse 65% 45% at 50% 58%, rgba(0,0,0,.52) 0%, transparent 70%),
+      linear-gradient(to bottom, rgba(3,7,15,.58) 0%, transparent 40%, rgba(3,7,15,.45) 100%);
+  }
+  .text-ocean {
+    text-shadow: 0 2px 32px rgba(0,0,0,.98), 0 1px 6px rgba(0,0,0,.85);
+  }
+  .glow-dot { box-shadow: 0 0 8px #0BC6B4; }
+  .input-focus-ring:focus-within {
+    border-color: rgba(65, 172, 143, 0.42);
+    box-shadow:   0 0 0 3px rgba(94,240,200,.07);
   }
 }
 
+/* Body and html must be ink-dark — the canvas sits on top of this. */
+html,
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  height: 100%;
+  background-color: #03070f;  /* --color-ink */
+  color: #ffffff;
+}
+
+/* ── Wave animation for the MusicToggle ── */
+@keyframes waveform {
+  0%, 100% { transform: scaleY(0.4); }
+  50% { transform: scaleY(1.2); }
 }
