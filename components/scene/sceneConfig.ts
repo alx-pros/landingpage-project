@@ -22,7 +22,7 @@ export const sceneConfig = {
     sunNight: 0x9db3f7,
     waterDay: 0x1b6d85,
     waterTwilight: 0x07121d,
-    waterNight: 0x01050b,
+    waterNight: 0x041a29,
     sunGlowDay: 0xfff2cf,
     sunGlowTwilight: 0xff9b58,
     sunGlowNight: 0xb9caff,
@@ -30,7 +30,7 @@ export const sceneConfig = {
   exposure: {
     day: 0.12,
     twilight: 0.095,
-    night: 0.04,
+    night: 0.06,
   },
   light: {
     dayIntensity: 0.9,
@@ -47,7 +47,7 @@ export const sceneConfig = {
     size: 0.9,
     dayAlpha: 0.76,
     twilightAlpha: 0.9,
-    nightAlpha: 0.97,
+    nightAlpha: 0.88,
     timeScale: 0.12,
   },
   bloom: {
@@ -76,7 +76,7 @@ export const sceneConfig = {
   sun: {
     dayReflectionIntensity: 1.85,
     twilightReflectionIntensity: 2.3,
-    nightReflectionIntensity: 0.35,
+    nightReflectionIntensity: 0.7,
     dayCoreScale: 92,
     twilightCoreScale: 132,
     nightCoreScale: 68,

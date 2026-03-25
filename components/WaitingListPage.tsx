@@ -5,6 +5,7 @@ import { useState, useId, useEffect, useCallback, useRef } from "react";
 import MusicToggle from "./MusicToggle";
 import Link from "next/link";
 import SceneTimePanel from "./SceneTimePanel";
+import { Logo } from "@/public/Logo";
 
 const OceanCanvas = dynamic(() => import("@/components/OceanCavas"), {
   ssr: false,
@@ -223,7 +224,7 @@ function WaitlistForm({
       </div>
       <button
         type="submit"
-        className={`absolute right-0 uppercase text-black tracking-widest bg-[#0BC6B4] hover:bg-[#0BC6B4]/30 rounded-tr-xl border-l border-[#0d8c6a] rounded-br-xl top-1/2 -translate-y-1/2 z-20 cursor-pointer flex items-center gap-2 px-3 sm:px-6 py-3.5 text-sm font-medium transition ${submitted ? "border-transparent! cursor-text" : ""}`}
+        className={`absolute right-0 uppercase text-black tracking-widest bg-[#0BC6B4] hover:bg-[#0BC6B4]/30 rounded-tr-xl border-l border-[#0d8c6a] rounded-br-xl top-1/2 -translate-y-1/2 z-20 cursor-pointer flex items-center gap-2 px-3 sm:px-6 py-3.5 text-sm font-medium transition ${submitted ? "cursor-text" : ""}`}
       >
         {submitted ? "Thank you!" : <p>Reserve a spot</p>}
       </button>
@@ -255,12 +256,15 @@ export default function WaitlistPage() {
       <OceanCanvas timeOverrideHour={timeOverrideHour} />
       <div className="fixed inset-0 z-10 pointer-events-none ocean-veil" />
 
-      <nav className="fixed min-w-[320px] top-0 inset-x-0 z-20 flex justify-between items-center px-10 py-8 animate-fade-down">
+      <nav className="fixed min-w-[320px] top-0 inset-x-0 z-20 flex justify-between items-center px-2 sm:px-10 py-8 animate-fade-down">
         <span className="font-display text-[0.92rem] font-bold tracking-[0.28em] uppercase text-[#0BC6B4] text-ocean">
-          DeepWave
+          <div className="flex items-center justify-center gap-2">
+            <Logo />
+            DeepWave
+          </div>
         </span>
-        <div className="flex items-center gap-3">
-          <div className="rounded-full border border-white/15 bg-[#03131f]/55 px-4 py-2 font-mono text-[0.75rem] tracking-[0.18em] text-[#ccecff] backdrop-blur-md">
+        <div className="flex items-center gap-2">
+          <div className="rounded-full border border-[#0d8c6a] bg-[#0BC6B4] text-white shadow-lg backdrop-blur-md transition-all text-sm px-3 py-1.5 h-9 font-mono tracking-[0.18em]">
             {displayedSceneTime}
           </div>
           <MusicToggle />
@@ -280,7 +284,10 @@ export default function WaitlistPage() {
           <br />
           is setting sail.
         </h1>
-        <label htmlFor="email" className="font-body text-[1.12rem] font-light leading-relaxed text-white/55 max-w-sm mb-9 text-ocean animate-fade-up [animation-delay:650ms]">
+        <label
+          htmlFor="email"
+          className="font-body text-[1.12rem] font-light leading-relaxed text-white/55 max-w-sm mb-9 text-ocean animate-fade-up [animation-delay:650ms]"
+        >
           A focused workspace for makers, writers, and builders who crave clarity. Built on calm.{" "}
           <span className="whitespace-nowrap">Launching soon.</span>
         </label>
@@ -291,7 +298,7 @@ export default function WaitlistPage() {
           </p>
         </div>
       </main>
-      <footer className="fixed min-w-[320px] bottom-0 inset-x-0 z-20 justify-between items-center px-10 py-8 animate-fade-down">
+      <footer className="fixed min-w-[320px] bottom-0 inset-x-0 z-20 justify-between items-center px-5 sm:px-10 py-8 animate-fade-down">
         <div className="flex flex-col sm:flex-row w-full items-center sm:justify-between gap-2">
           <p className="text-left text-sm leading-normal text-white">
             © {currentYear} DeepWave. All rights reserved.

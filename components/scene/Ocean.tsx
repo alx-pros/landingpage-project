@@ -13,16 +13,27 @@ function updateWaterMaterial(
   scene: SceneSnapshot,
   step: number,
   sunDir: THREE.Vector3,
+  moonDir: THREE.Vector3,
 ) {
   const uniforms = material.uniforms;
+  const lightDirection = sunDir.clone().lerp(moonDir, scene.nightFactor).normalize();
+  const highlightColor = new THREE.Color(scene.sunColorHex).lerp(
+    new THREE.Color(0xc7dbff),
+    scene.nightFactor
+  );
+  const highlightIntensity = THREE.MathUtils.lerp(
+    scene.sunReflectionIntensity,
+    0.95,
+    scene.nightFactor
+  );
 
   uniforms["time"].value += step * scene.waterTimeScale;
   uniforms["distortionScale"].value = scene.waterDistortionScale;
   uniforms["size"].value = scene.waterSize;
   uniforms["alpha"].value = scene.waterAlpha;
   uniforms["waterColor"].value.setHex(scene.waterColorHex);
-  uniforms["sunDirection"].value.copy(sunDir);
-  uniforms["sunColor"].value.setHex(scene.sunColorHex).multiplyScalar(scene.sunReflectionIntensity);
+  uniforms["sunDirection"].value.copy(lightDirection);
+  uniforms["sunColor"].value.copy(highlightColor).multiplyScalar(highlightIntensity);
 }
 
 export default function Ocean() {
@@ -51,17 +62,20 @@ export default function Ocean() {
   }, [geometry, normalTexture]);
 
   const _sunDir = useRef(new THREE.Vector3());
+  const _moonDir = useRef(new THREE.Vector3());
 
   useFrame((_, delta) => {
     const scene = getSceneSnapshot(getSceneDate(), sceneParams.location);
     const step = Math.min(delta, 1 / 30);
 
     vecFromSpherical(scene.sunElev, scene.sunAz, _sunDir.current);
+    vecFromSpherical(scene.moonElev, scene.moonAz, _moonDir.current);
     updateWaterMaterial(
       water.material as THREE.ShaderMaterial,
       scene,
       step,
       _sunDir.current,
+      _moonDir.current,
     );
   });
 

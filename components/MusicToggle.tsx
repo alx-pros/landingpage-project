@@ -82,13 +82,13 @@ export default function MusicToggle() {
         aria-label="music button"
         disabled={disabled}
         onClick={() => !disabled && setIsPlaying(!isPlaying)}
-        className="fixed cursor-pointer top-5 right-6 z-30 flex h-11 w-11 items-center justify-center rounded-full border border-[#0d8c6a] bg-[#0BC6B4] hover:bg-[#0BC6B4]/30 text-white shadow-lg backdrop-blur-md transition-all"
+        className="cursor-pointer flex h-9 w-9 items-center justify-center rounded-full border border-[#0d8c6a] bg-[#0BC6B4] hover:bg-[#0BC6B4]/30 text-white shadow-lg backdrop-blur-md transition-all"
       >
         <span className="flex items-center gap-[3px] h-[32px]">
           {barHeights.map((height, i) => (
             <span
               key={i}
-              className="block w-[2px] bg-white rounded-full transition-all duration-500 ease-in-out"
+              className="block w-[1px] bg-white rounded-full transition-all duration-500 ease-in-out"
               style={{
                 // 1. Initial State (The Dot)
                 height: isPlaying ? `${height}px` : "3px",

@@ -22,54 +22,112 @@ interface SphericalPoint {
 const CONSTELLATION_SETS = [
   {
     stars: [
-      { elevation: 55, azimuth: 330 },
-      { elevation: 58, azimuth: 342 },
-      { elevation: 61, azimuth: 356 },
-      { elevation: 64, azimuth: 9 },
-      { elevation: 69, azimuth: 18 },
-      { elevation: 74, azimuth: 24 },
-      { elevation: 78, azimuth: 33 },
+      { elevation: 34, azimuth: 338 },
+      { elevation: 31, azimuth: 346 },
+      { elevation: 29, azimuth: 356 },
+      { elevation: 26, azimuth: 6 },
+      { elevation: 22, azimuth: 16 },
+      { elevation: 18, azimuth: 24 },
+      { elevation: 14, azimuth: 31 },
     ],
     segments: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6]],
   },
   {
     stars: [
-      { elevation: 64, azimuth: 36 },
-      { elevation: 69, azimuth: 28 },
-      { elevation: 72, azimuth: 18 },
-      { elevation: 69, azimuth: 10 },
-      { elevation: 64, azimuth: 3 },
+      { elevation: 32, azimuth: 330 },
+      { elevation: 35, azimuth: 342 },
+      { elevation: 38, azimuth: 356 },
+      { elevation: 40, azimuth: 9 },
+      { elevation: 43, azimuth: 18 },
+      { elevation: 46, azimuth: 24 },
+      { elevation: 49, azimuth: 33 },
+    ],
+    segments: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6]],
+  },
+  {
+    stars: [
+      { elevation: 23, azimuth: 32 },
+      { elevation: 27, azimuth: 24 },
+      { elevation: 30, azimuth: 17 },
+      { elevation: 26, azimuth: 9 },
+      { elevation: 22, azimuth: 2 },
     ],
     segments: [[0, 1], [1, 2], [2, 3], [3, 4]],
   },
   {
     stars: [
-      { elevation: 28, azimuth: 218 },
-      { elevation: 34, azimuth: 225 },
-      { elevation: 31, azimuth: 233 },
-      { elevation: 22, azimuth: 222 },
-      { elevation: 17, azimuth: 227 },
-      { elevation: 23, azimuth: 238 },
-      { elevation: 28, azimuth: 244 },
+      { elevation: 14, azimuth: 210 },
+      { elevation: 18, azimuth: 220 },
+      { elevation: 16, azimuth: 232 },
+      { elevation: 10, azimuth: 222 },
+      { elevation: 7, azimuth: 229 },
+      { elevation: 11, azimuth: 240 },
+      { elevation: 15, azimuth: 247 },
     ],
     segments: [[0, 1], [1, 2], [1, 3], [3, 4], [2, 5], [5, 6]],
+  },
+  {
+    stars: [
+      { elevation: 21, azimuth: 154 },
+      { elevation: 24, azimuth: 163 },
+      { elevation: 27, azimuth: 175 },
+      { elevation: 23, azimuth: 184 },
+      { elevation: 18, azimuth: 195 },
+      { elevation: 16, azimuth: 205 },
+    ],
+    segments: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5]],
+  },
+  {
+    stars: [
+      { elevation: 16, azimuth: 126 },
+      { elevation: 19, azimuth: 136 },
+      { elevation: 22, azimuth: 146 },
+      { elevation: 18, azimuth: 157 },
+      { elevation: 13, azimuth: 166 },
+      { elevation: 11, azimuth: 176 },
+    ],
+    segments: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5]],
+  },
+  {
+    stars: [
+      { elevation: 12, azimuth: 88 },
+      { elevation: 15, azimuth: 97 },
+      { elevation: 17, azimuth: 107 },
+      { elevation: 15, azimuth: 118 },
+      { elevation: 11, azimuth: 128 },
+    ],
+    segments: [[0, 1], [1, 2], [2, 3], [3, 4]],
   },
 ] as const
 
 const COMET_PATHS = [
   {
-    start: { elevation: 68, azimuth: 300 },
-    end: { elevation: 47, azimuth: 255 },
-    duration: 2.7,
-    delay: 12,
-    offset: 1.5,
+    start: { elevation: 56, azimuth: 292 },
+    end: { elevation: 33, azimuth: 248 },
+    duration: 6.2,
+    delay: 2.6,
+    offset: 0.8,
   },
   {
-    start: { elevation: 73, azimuth: 35 },
-    end: { elevation: 51, azimuth: 75 },
-    duration: 2.3,
-    delay: 16,
-    offset: 7.4,
+    start: { elevation: 61, azimuth: 28 },
+    end: { elevation: 36, azimuth: 74 },
+    duration: 5.4,
+    delay: 3.2,
+    offset: 3.6,
+  },
+  {
+    start: { elevation: 48, azimuth: 334 },
+    end: { elevation: 27, azimuth: 18 },
+    duration: 4.8,
+    delay: 3.8,
+    offset: 6.2,
+  },
+  {
+    start: { elevation: 44, azimuth: 84 },
+    end: { elevation: 21, azimuth: 128 },
+    duration: 5.6,
+    delay: 4.2,
+    offset: 8.4,
   },
 ] as const
 
@@ -236,6 +294,66 @@ function createStarGlowTexture() {
   return texture
 }
 
+function createMoonCrescentTexture() {
+  const size = 256
+  const canvas = document.createElement('canvas')
+  canvas.width = size
+  canvas.height = size
+  const context = canvas.getContext('2d')
+
+  if (!context) {
+    return new THREE.Texture()
+  }
+
+  context.clearRect(0, 0, size, size)
+  context.fillStyle = 'rgba(238, 236, 221, 0.98)'
+  context.beginPath()
+  context.arc(size * 0.48, size * 0.5, size * 0.23, 0, Math.PI * 2)
+  context.fill()
+
+  context.globalCompositeOperation = 'destination-out'
+  context.beginPath()
+  context.arc(size * 0.58, size * 0.46, size * 0.23, 0, Math.PI * 2)
+  context.fill()
+  context.globalCompositeOperation = 'source-over'
+
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.needsUpdate = true
+  return texture
+}
+
+function createMoonGlowTexture() {
+  const size = 224
+  const canvas = document.createElement('canvas')
+  canvas.width = size
+  canvas.height = size
+  const context = canvas.getContext('2d')
+
+  if (!context) {
+    return new THREE.Texture()
+  }
+
+  const gradient = context.createRadialGradient(
+    size / 2,
+    size / 2,
+    0,
+    size / 2,
+    size / 2,
+    size / 2,
+  )
+
+  gradient.addColorStop(0, 'rgba(222, 235, 255, 0.88)')
+  gradient.addColorStop(0.28, 'rgba(180, 212, 255, 0.34)')
+  gradient.addColorStop(1, 'rgba(180, 212, 255, 0)')
+
+  context.fillStyle = gradient
+  context.fillRect(0, 0, size, size)
+
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.needsUpdate = true
+  return texture
+}
+
 function Starfield() {
   const baseMatRef = useRef<THREE.PointsMaterial>(null)
   const brightMatRef = useRef<THREE.PointsMaterial>(null)
@@ -246,32 +364,30 @@ function Starfield() {
     if (!baseMatRef.current || !brightMatRef.current) return
     const safeDelta = Math.min(delta, 1 / 30)
     const scene = getSceneSnapshot(getSceneDate(), sceneParams.location)
-    const glowFactor = THREE.MathUtils.clamp(
-      scene.starsOpacity + scene.twilightFactor * 0.42,
-      0,
-      1,
-    )
-    const shimmer = 0.88 + Math.sin(state.clock.elapsedTime * 0.7) * 0.08
-    const brightPulse = 0.78 + Math.sin(state.clock.elapsedTime * 2.4) * 0.22
+    const glowFactor = THREE.MathUtils.clamp(scene.starsOpacity * 1.2, 0, 1)
+    const shimmer = 0.94 + Math.sin(state.clock.elapsedTime * 0.9) * 0.11
+    const brightPulse = 0.9 + Math.sin(state.clock.elapsedTime * 2.8) * 0.24
 
     baseMatRef.current.opacity = THREE.MathUtils.lerp(
-      baseMatRef.current.opacity, glowFactor * 0.96 * shimmer, safeDelta * 1.5,
+      baseMatRef.current.opacity,
+      Math.min(1, glowFactor * 1.28 * shimmer),
+      safeDelta * 1.7,
     )
     baseMatRef.current.size = THREE.MathUtils.lerp(
       baseMatRef.current.size,
-      1.8 + glowFactor * 0.55,
-      safeDelta * 1.3,
+      2.3 + glowFactor * 1.15,
+      safeDelta * 1.5,
     )
 
     brightMatRef.current.opacity = THREE.MathUtils.lerp(
       brightMatRef.current.opacity,
-      glowFactor * 0.78 * brightPulse,
-      safeDelta * 2.1,
+      Math.min(1, glowFactor * 1.32 * brightPulse),
+      safeDelta * 2.4,
     )
     brightMatRef.current.size = THREE.MathUtils.lerp(
       brightMatRef.current.size,
-      2.6 + glowFactor * 1.45,
-      safeDelta * 1.8,
+      4 + glowFactor * 2.4,
+      safeDelta * 2,
     )
   })
 
@@ -309,61 +425,35 @@ function Starfield() {
   )
 }
 
-function PolarStarAndConstellations() {
-  const northStarRef = useRef<THREE.Sprite>(null)
-  const northStarMatRef = useRef<THREE.SpriteMaterial>(null)
+function Constellations() {
   const lineMatRef = useRef<THREE.LineBasicMaterial>(null)
   const pointMatRef = useRef<THREE.PointsMaterial>(null)
-  const glowTexture = useMemo(() => createStarGlowTexture(), [])
   const constellationData = useMemo(() => createConstellationData(), [])
-  const _northStarPos = useRef(new THREE.Vector3())
-
-  useEffect(() => {
-    return () => {
-      glowTexture.dispose()
-    }
-  }, [glowTexture])
 
   useFrame((state, delta) => {
-    if (!northStarRef.current || !northStarMatRef.current || !lineMatRef.current || !pointMatRef.current) {
+    if (!lineMatRef.current || !pointMatRef.current) {
       return
     }
 
     const safeDelta = Math.min(delta, 1 / 30)
     const scene = getSceneSnapshot(getSceneDate(), sceneParams.location)
-    const starVisibility = THREE.MathUtils.clamp(
-      scene.starsOpacity + scene.twilightFactor * 0.35,
-      0,
-      1,
-    )
-    const constellationVisibility = THREE.MathUtils.clamp(scene.nightFactor * 1.15, 0, 1)
-    const latitude = sceneParams.location?.latitude ?? 43
-    const polarisElevation = THREE.MathUtils.clamp(Math.abs(latitude), 24, 66)
-    const pulse = 0.88 + Math.sin(state.clock.elapsedTime * 1.8) * 0.12
-
-    vecFromSpherical(polarisElevation, 0, _northStarPos.current)
-    northStarRef.current.position.copy(_northStarPos.current).multiplyScalar(7_380)
-    northStarRef.current.scale.setScalar(90 + starVisibility * 65 * pulse)
-
-    northStarMatRef.current.opacity = THREE.MathUtils.lerp(
-      northStarMatRef.current.opacity,
-      starVisibility * 0.92 * pulse,
-      safeDelta * 2.2,
-    )
+    const starVisibility = THREE.MathUtils.clamp(scene.starsOpacity * 1.18, 0, 1)
+    const pulse = 0.92 + Math.sin(state.clock.elapsedTime * 1.9) * 0.12
+    const constellationVisibility = THREE.MathUtils.clamp(scene.starsOpacity * 1.06, 0, 1)
     lineMatRef.current.opacity = THREE.MathUtils.lerp(
       lineMatRef.current.opacity,
-      constellationVisibility * 0.42,
-      safeDelta * 1.8,
+      constellationVisibility * 0.72,
+      safeDelta * 2,
     )
     pointMatRef.current.opacity = THREE.MathUtils.lerp(
       pointMatRef.current.opacity,
-      constellationVisibility * 0.88,
-      safeDelta * 1.8,
+      Math.min(1, starVisibility * 1.05 * pulse),
+      safeDelta * 2.1,
     )
     pointMatRef.current.size = THREE.MathUtils.lerp(
       pointMatRef.current.size,
-      3.1 + constellationVisibility * 0.8,
-      safeDelta * 1.8,
+      3.2 + constellationVisibility * 0.9,
+      safeDelta * 2.1,
     )
   })
 
@@ -395,18 +485,6 @@ function PolarStarAndConstellations() {
           depthWrite={false}
         />
       </points>
-      <sprite ref={northStarRef} renderOrder={9}>
-        <spriteMaterial
-          ref={northStarMatRef}
-          map={glowTexture}
-          color="#eef6ff"
-          transparent
-          opacity={0}
-          depthWrite={false}
-          depthTest={false}
-          blending={THREE.AdditiveBlending}
-        />
-      </sprite>
     </>
   )
 }
@@ -452,7 +530,7 @@ function Comet({
     }
 
     const scene = getSceneSnapshot(getSceneDate(), sceneParams.location)
-    const nightVisibility = THREE.MathUtils.clamp((scene.nightFactor - 0.08) / 0.92, 0, 1)
+    const nightVisibility = THREE.MathUtils.clamp(scene.starsOpacity * 1.2, 0, 1)
     const cycle = duration + delay
     const localTime = (state.clock.elapsedTime + offset) % cycle
 
@@ -464,12 +542,12 @@ function Comet({
     const progress = localTime / duration
     const easedProgress = THREE.MathUtils.smootherstep(progress, 0, 1)
     const tailProgress = Math.max(0, easedProgress - 0.18)
-    const fade = Math.sin(progress * Math.PI)
+    const fade = 0.4 + Math.sin(progress * Math.PI) * 0.6
 
     _headPos.current.copy(path.start).lerp(path.end, easedProgress)
     _tailPos.current.copy(path.start).lerp(path.end, tailProgress)
     headRef.current.position.copy(_headPos.current)
-    headRef.current.scale.setScalar(62 + fade * 34)
+    headRef.current.scale.setScalar(126 + fade * 72)
 
     trailPositions[0] = _tailPos.current.x
     trailPositions[1] = _tailPos.current.y
@@ -479,8 +557,8 @@ function Comet({
     trailPositions[5] = _headPos.current.z
     trailAttrRef.current.needsUpdate = true
 
-    headMatRef.current.opacity = fade * nightVisibility * 0.95
-    trailMatRef.current.opacity = fade * nightVisibility * 0.72
+    headMatRef.current.opacity = fade * nightVisibility
+    trailMatRef.current.opacity = fade * nightVisibility
     groupRef.current.visible = true
   })
 
@@ -536,36 +614,73 @@ function CometField() {
 }
 
 function Moon() {
-  const meshRef = useRef<THREE.Mesh>(null)
-  const matRef  = useRef<THREE.MeshStandardMaterial>(null)
-  const _pos    = useRef(new THREE.Vector3())
+  const groupRef = useRef<THREE.Group>(null)
+  const crescentRef = useRef<THREE.Sprite>(null)
+  const crescentMatRef  = useRef<THREE.SpriteMaterial>(null)
+  const glowMatRef = useRef<THREE.SpriteMaterial>(null)
+  const crescentTexture = useMemo(() => createMoonCrescentTexture(), [])
+  const glowTexture = useMemo(() => createMoonGlowTexture(), [])
+  const _pos = useRef(new THREE.Vector3())
+
+  useEffect(() => {
+    return () => {
+      crescentTexture.dispose()
+      glowTexture.dispose()
+    }
+  }, [crescentTexture, glowTexture])
 
   useFrame((_, delta) => {
-    if (!meshRef.current || !matRef.current) return
+    if (!groupRef.current || !crescentRef.current || !crescentMatRef.current || !glowMatRef.current) return
     const safeDelta = Math.min(delta, 1 / 30)
     const scene = getSceneSnapshot(getSceneDate(), sceneParams.location)
     vecFromSpherical(scene.moonElev, scene.moonAz, _pos.current)
-    meshRef.current.position.copy(_pos.current).multiplyScalar(4_200)
-    matRef.current.opacity = THREE.MathUtils.lerp(
-      matRef.current.opacity, scene.moonOpacity, safeDelta * 1.5,
+    groupRef.current.position.copy(_pos.current).multiplyScalar(4_200)
+
+    const moonVisibility = THREE.MathUtils.clamp(scene.moonOpacity * 1.05, 0, 1)
+    const glowVisibility = THREE.MathUtils.clamp(scene.nightFactor * 0.75 + scene.twilightFactor * 0.35, 0, 1)
+    const orientation = THREE.MathUtils.degToRad(scene.sunAz - scene.moonAz + 90)
+
+    crescentRef.current.scale.setScalar(132 + glowVisibility * 28)
+    crescentMatRef.current.rotation = orientation
+    crescentMatRef.current.opacity = THREE.MathUtils.lerp(
+      crescentMatRef.current.opacity,
+      moonVisibility,
+      safeDelta * 2,
     )
+    glowMatRef.current.opacity = THREE.MathUtils.lerp(
+      glowMatRef.current.opacity,
+      glowVisibility * 0.34,
+      safeDelta * 2,
+    )
+    groupRef.current.visible = glowVisibility > 0.02
   })
 
   return (
-    <mesh ref={meshRef}>
-      <sphereGeometry args={[50, 32, 32]} />
-      <meshStandardMaterial
-        ref={matRef}
-        color="#d8d0c0"
-        emissive="#b0a888"
-        emissiveIntensity={1.0}
-        roughness={0.95}
-        metalness={0}
-        transparent
-        opacity={0}
-        depthWrite={false}
-      />
-    </mesh>
+    <group ref={groupRef} visible={false} renderOrder={8}>
+      <sprite scale={[280, 280, 1]}>
+        <spriteMaterial
+          ref={glowMatRef}
+          map={glowTexture}
+          color="#c4d9ff"
+          transparent
+          opacity={0}
+          depthWrite={false}
+          depthTest={false}
+          blending={THREE.AdditiveBlending}
+        />
+      </sprite>
+      <sprite ref={crescentRef}>
+        <spriteMaterial
+          ref={crescentMatRef}
+          map={crescentTexture}
+          color="#ebe7d6"
+          transparent
+          opacity={0}
+          depthWrite={false}
+          depthTest={false}
+        />
+      </sprite>
+    </group>
   )
 }
 
@@ -733,7 +848,7 @@ export default function OceanScene() {
       <primitive object={sky} />
       <SunGlow />
       <Starfield />
-      <PolarStarAndConstellations />
+      <Constellations />
       <CometField />
       <Moon />
       <Suspense fallback={null}>

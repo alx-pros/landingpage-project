@@ -225,6 +225,23 @@ function getReferenceMoonPosition(hours: number): { elevation: number; azimuth: 
   };
 }
 
+function getStarScheduleVisibility(hours: number) {
+  const dawnEnd = 4 + 40 / 60;
+  const duskStart = 17 + 40 / 60;
+  const dawnFadeStart = dawnEnd - 0.5;
+  const duskFadeEnd = duskStart + 0.5;
+
+  if (hours < dawnEnd) {
+    return 1 - smoothstep(dawnFadeStart, dawnEnd, hours);
+  }
+
+  if (hours >= duskStart) {
+    return smoothstep(duskStart, duskFadeEnd, hours);
+  }
+
+  return 0;
+}
+
 export function getSceneSnapshot(
   date: Date = new Date(),
   location: SceneLocation | null = null
@@ -399,6 +416,14 @@ export function getSceneSnapshot(
     nightFactor
   );
 
+  const scheduledStarsVisibility = getStarScheduleVisibility(hours);
+  const starsOpacity = clamp(nightFactor * 1.55 * scheduledStarsVisibility, 0, 1);
+  const moonOpacity = clamp(
+    (0.08 + nightFactor * 1.15 + twilightFactor * 0.1) * Math.max(0.2, scheduledStarsVisibility),
+    0,
+    1
+  );
+
   return {
     sunElev: sun.elevation,
     sunAz: sun.azimuth,
@@ -436,8 +461,8 @@ export function getSceneSnapshot(
     ),
     nightFactor,
     twilightFactor,
-    starsOpacity: clamp(nightFactor * 1.35, 0, 1),
-    moonOpacity: clamp(0.15 + nightFactor * 1.1, 0, 1),
+    starsOpacity,
+    moonOpacity,
     exposure,
     waterDistortionScale,
     waterSize: sceneConfig.water.size,
