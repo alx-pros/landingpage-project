@@ -157,6 +157,7 @@ function createConstellationData(radius = 7_420) {
   const pointCoords: number[] = []
   const tempA = new THREE.Vector3()
   const tempB = new THREE.Vector3()
+  const tempMid = new THREE.Vector3()
 
   for (const constellation of CONSTELLATION_SETS) {
     const points = constellation.stars.map((star) => {
@@ -172,6 +173,9 @@ function createConstellationData(radius = 7_420) {
     for (const [from, to] of constellation.segments) {
       tempA.copy(points[from])
       tempB.copy(points[to])
+      tempMid.copy(tempA).add(tempB).multiplyScalar(0.5)
+      tempA.lerp(tempMid, 0.34)
+      tempB.lerp(tempMid, 0.34)
       lineCoords.push(tempA.x, tempA.y, tempA.z, tempB.x, tempB.y, tempB.z)
     }
   }
@@ -437,22 +441,22 @@ function Constellations() {
 
     const safeDelta = Math.min(delta, 1 / 30)
     const scene = getSceneSnapshot(getSceneDate(), sceneParams.location)
-    const starVisibility = THREE.MathUtils.clamp(scene.starsOpacity * 1.18, 0, 1)
-    const pulse = 0.92 + Math.sin(state.clock.elapsedTime * 1.9) * 0.12
-    const constellationVisibility = THREE.MathUtils.clamp(scene.starsOpacity * 1.06, 0, 1)
+    const starVisibility = THREE.MathUtils.clamp(scene.starsOpacity * 0.7, 0, 1)
+    const pulse = 0.94 + Math.sin(state.clock.elapsedTime * 1.9) * 0.08
+    const constellationVisibility = THREE.MathUtils.clamp(scene.starsOpacity * 0.62, 0, 1)
     lineMatRef.current.opacity = THREE.MathUtils.lerp(
       lineMatRef.current.opacity,
-      constellationVisibility * 0.72,
+      constellationVisibility * 0.12,
       safeDelta * 2,
     )
     pointMatRef.current.opacity = THREE.MathUtils.lerp(
       pointMatRef.current.opacity,
-      Math.min(1, starVisibility * 1.05 * pulse),
+      Math.min(0.42, starVisibility * 0.42 * pulse),
       safeDelta * 2.1,
     )
     pointMatRef.current.size = THREE.MathUtils.lerp(
       pointMatRef.current.size,
-      3.2 + constellationVisibility * 0.9,
+      0.92 + constellationVisibility * 0.16,
       safeDelta * 2.1,
     )
   })
@@ -478,7 +482,7 @@ function Constellations() {
         <pointsMaterial
           ref={pointMatRef}
           color="#eef6ff"
-          size={3.1}
+          size={0.95}
           transparent
           opacity={0}
           sizeAttenuation={false}
@@ -541,13 +545,13 @@ function Comet({
 
     const progress = localTime / duration
     const easedProgress = THREE.MathUtils.smootherstep(progress, 0, 1)
-    const tailProgress = Math.max(0, easedProgress - 0.18)
-    const fade = 0.4 + Math.sin(progress * Math.PI) * 0.6
+    const tailProgress = Math.max(0, easedProgress - 0.032)
+    const fade = 0.72 + Math.sin(progress * Math.PI) * 0.28
 
     _headPos.current.copy(path.start).lerp(path.end, easedProgress)
     _tailPos.current.copy(path.start).lerp(path.end, tailProgress)
     headRef.current.position.copy(_headPos.current)
-    headRef.current.scale.setScalar(126 + fade * 72)
+    headRef.current.scale.setScalar(14 + fade * 7)
 
     trailPositions[0] = _tailPos.current.x
     trailPositions[1] = _tailPos.current.y
@@ -557,8 +561,8 @@ function Comet({
     trailPositions[5] = _headPos.current.z
     trailAttrRef.current.needsUpdate = true
 
-    headMatRef.current.opacity = fade * nightVisibility
-    trailMatRef.current.opacity = fade * nightVisibility
+    headMatRef.current.opacity = Math.min(1, fade * 1.15 * nightVisibility)
+    trailMatRef.current.opacity = fade * 0.78 * nightVisibility
     groupRef.current.visible = true
   })
 
@@ -574,7 +578,7 @@ function Comet({
         </bufferGeometry>
         <lineBasicMaterial
           ref={trailMatRef}
-          color="#dceeff"
+          color="#eff8ff"
           transparent
           opacity={0}
           depthWrite={false}
@@ -584,7 +588,7 @@ function Comet({
         <spriteMaterial
           ref={headMatRef}
           map={glowTexture}
-          color="#f6fbff"
+          color="#ffffff"
           transparent
           opacity={0}
           depthWrite={false}

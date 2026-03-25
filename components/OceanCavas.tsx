@@ -2,14 +2,19 @@
 
 import { useEffect, useState } from "react";
 import { Canvas } from "@react-three/fiber";
-import { useProgress } from "@react-three/drei";
+import { Preload, useProgress } from "@react-three/drei";
 import * as THREE from "three";
 import OceanScene from "./scene/OceanScene";
 import { AnimatePresence, motion } from "framer-motion";
 import { setSceneTimeOverride } from "./scene/sceneParams";
 
-function SceneLoadingOverlay() {
-  const { active, progress } = useProgress();
+function SceneLoadingOverlay({
+  active,
+  progress,
+}: {
+  active: boolean;
+  progress: number;
+}) {
   const [isFinished, setIsFinished] = useState(false);
 
   useEffect(() => {
@@ -17,6 +22,8 @@ function SceneLoadingOverlay() {
       const timeout = setTimeout(() => setIsFinished(true), 800);
       return () => clearTimeout(timeout);
     }
+
+    setIsFinished(false);
   }, [active, progress]);
 
   return (
@@ -96,6 +103,9 @@ export default function OceanCanvas({
 }: {
   timeOverrideHour?: number | null;
 }) {
+  const { active, progress } = useProgress();
+  const sceneReady = !active && progress === 100;
+
   useEffect(() => {
     setSceneTimeOverride(timeOverrideHour);
   }, [timeOverrideHour]);
@@ -104,7 +114,15 @@ export default function OceanCanvas({
     <>
       <Canvas
         dpr={[1, 1.5]}
-        style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%" }}
+        style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          width: "100%",
+          height: "100%",
+          opacity: sceneReady ? 1 : 0,
+          transition: "opacity 700ms ease",
+        }}
         camera={{
           fov: 55,
           near: 1,
@@ -120,9 +138,10 @@ export default function OceanCanvas({
           antialias: true,
         }}
       >
+        <Preload all />
         <OceanScene />
       </Canvas>
-      <SceneLoadingOverlay />
+      <SceneLoadingOverlay active={active} progress={progress} />
     </>
   );
 }
