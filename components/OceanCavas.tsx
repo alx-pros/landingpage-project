@@ -8,13 +8,7 @@ import OceanScene from "./scene/OceanScene";
 import { AnimatePresence, motion } from "framer-motion";
 import { setSceneTimeOverride } from "./scene/sceneParams";
 
-function SceneLoadingOverlay({
-  active,
-  progress,
-}: {
-  active: boolean;
-  progress: number;
-}) {
+function SceneLoadingOverlay({ active, progress }: { active: boolean; progress: number }) {
   const [isFinished, setIsFinished] = useState(false);
 
   useEffect(() => {
@@ -120,8 +114,10 @@ export default function OceanCanvas({
           left: 0,
           width: "100%",
           height: "100%",
+          pointerEvents: "auto",
           opacity: sceneReady ? 1 : 0,
           transition: "opacity 700ms ease",
+          zIndex: 0,
         }}
         camera={{
           fov: 55,

@@ -22,60 +22,89 @@ interface SphericalPoint {
 const CONSTELLATION_SETS = [
   {
     stars: [
-      { elevation: 34, azimuth: 338 },
-      { elevation: 31, azimuth: 346 },
-      { elevation: 29, azimuth: 356 },
-      { elevation: 26, azimuth: 6 },
-      { elevation: 22, azimuth: 16 },
-      { elevation: 18, azimuth: 24 },
-      { elevation: 14, azimuth: 31 },
+      { elevation: 7, azimuth: 357.8 },
+      { elevation: 7.6, azimuth: 353.8 },
+      { elevation: 8.8, azimuth: 353.3 },
+      { elevation: 10.3, azimuth: 352.9 },
+      { elevation: 13.2, azimuth: 357.3 },
+      { elevation: 13.3, azimuth: 361.3 },
+      { elevation: 15.4, azimuth: 364 },
     ],
     segments: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6]],
   },
   {
     stars: [
-      { elevation: 32, azimuth: 330 },
-      { elevation: 35, azimuth: 342 },
-      { elevation: 38, azimuth: 356 },
-      { elevation: 40, azimuth: 9 },
-      { elevation: 43, azimuth: 18 },
-      { elevation: 46, azimuth: 24 },
-      { elevation: 49, azimuth: 33 },
-    ],
-    segments: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6]],
-  },
-  {
-    stars: [
-      { elevation: 23, azimuth: 32 },
-      { elevation: 27, azimuth: 24 },
-      { elevation: 30, azimuth: 17 },
-      { elevation: 26, azimuth: 9 },
-      { elevation: 22, azimuth: 2 },
+      { elevation: 9.8, azimuth: 332.7 },
+      { elevation: 10.6, azimuth: 332 },
+      { elevation: 13, azimuth: 330.7 },
+      { elevation: 13.9, azimuth: 327.4 },
+      { elevation: 15.5, azimuth: 327.8 },
     ],
     segments: [[0, 1], [1, 2], [2, 3], [3, 4]],
   },
+
+  // Ursa Minor
   {
     stars: [
-      { elevation: 14, azimuth: 210 },
-      { elevation: 18, azimuth: 220 },
-      { elevation: 16, azimuth: 232 },
-      { elevation: 10, azimuth: 222 },
-      { elevation: 7, azimuth: 229 },
-      { elevation: 11, azimuth: 240 },
-      { elevation: 15, azimuth: 247 },
+      { elevation: 16.2, azimuth: 18.5 },
+      { elevation: 18.9, azimuth: 16 },
+      { elevation: 21.9, azimuth: 16.2 },
+      { elevation: 24.5, azimuth: 18.9 },
+      { elevation: 26.8, azimuth: 22.4 },
     ],
-    segments: [[0, 1], [1, 2], [1, 3], [3, 4], [2, 5], [5, 6]],
+    segments: [[0, 1], [1, 2], [2, 3], [3, 4]],
+  },
+
+  // Ursa Minor
+  {
+    stars: [
+      { elevation: 16.6, azimuth: 18.4 },
+      { elevation: 21.6, azimuth: 20.6 },
+      { elevation: 22.3, azimuth: 16.2 },
+    ],
+    segments: [[0, 1], [1, 2]],
   },
   {
     stars: [
-      { elevation: 21, azimuth: 154 },
-      { elevation: 24, azimuth: 163 },
-      { elevation: 27, azimuth: 175 },
-      { elevation: 23, azimuth: 184 },
-      { elevation: 18, azimuth: 195 },
-      { elevation: 16, azimuth: 205 },
+      { elevation: 15.3, azimuth: 241 },
+      { elevation: 12.3, azimuth: 238.8 },
+      { elevation: 15, azimuth: 237.7 },
+      { elevation: 14.2, azimuth: 233.5 },
+      { elevation: 14.3, azimuth: 233.1 },
+      { elevation: 18.9, azimuth: 232.5 },
+      { elevation: 19.9, azimuth: 226.5 },
+      { elevation: 23.5, azimuth: 224.8 },
     ],
-    segments: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5]],
+    segments: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 7]],
+  },
+
+  // Ursa Major
+  {
+    stars: [
+      { elevation: 9.3, azimuth: 160 },
+      { elevation: 10.3, azimuth: 159.23 },
+      { elevation: 13.8, azimuth: 164.9 },
+      { elevation: 15.7, azimuth: 171 },
+      { elevation: 14.8, azimuth: 177.2 },
+      { elevation: 11, azimuth: 176.8 },
+      { elevation: 14.2, azimuth: 182.8 },
+      { elevation: 11, azimuth: 178.2 },
+      { elevation: 14.2, azimuth: 182.8 },
+      { elevation: 18.7, azimuth: 184 },
+      { elevation: 19, azimuth: 182.2 },
+      { elevation: 20.7, azimuth: 185.8 },
+      { elevation: 24.3, azimuth: 185.5 },
+      { elevation: 13.9, azimuth: 187.8 },
+      { elevation: 11.6, azimuth: 187.6 },
+      { elevation: 9.5, azimuth: 187.3 },
+      { elevation: 7.9, azimuth: 186.3 },
+      { elevation: 13.4, azimuth: 190 },
+      { elevation: 12.5, azimuth: 190.6 },
+      { elevation: 8.9, azimuth: 191.9 },
+      { elevation: 7.9, azimuth: 191 },
+
+    ],
+    segments: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [4, 6], [5, 7], [7, 8], [8, 9], [9, 10], [10, 11], [11, 12], [6, 13], [13, 14], [14, 15], [15, 16], [13, 17], [17, 18], [18, 19], [19, 20]],
   },
   {
     stars: [
@@ -157,7 +186,7 @@ function createConstellationData(radius = 7_420) {
   const pointCoords: number[] = []
   const tempA = new THREE.Vector3()
   const tempB = new THREE.Vector3()
-  const tempMid = new THREE.Vector3()
+  const centroid = new THREE.Vector3()
 
   for (const constellation of CONSTELLATION_SETS) {
     const points = constellation.stars.map((star) => {
@@ -166,6 +195,16 @@ function createConstellationData(radius = 7_420) {
         .clone()
     })
 
+    centroid.set(0, 0, 0)
+    for (const point of points) {
+      centroid.add(point)
+    }
+    centroid.multiplyScalar(1 / points.length)
+
+    for (const point of points) {
+      point.lerp(centroid, 0.22)
+    }
+
     for (const point of points) {
       pointCoords.push(point.x, point.y, point.z)
     }
@@ -173,9 +212,6 @@ function createConstellationData(radius = 7_420) {
     for (const [from, to] of constellation.segments) {
       tempA.copy(points[from])
       tempB.copy(points[to])
-      tempMid.copy(tempA).add(tempB).multiplyScalar(0.5)
-      tempA.lerp(tempMid, 0.34)
-      tempB.lerp(tempMid, 0.34)
       lineCoords.push(tempA.x, tempA.y, tempA.z, tempB.x, tempB.y, tempB.z)
     }
   }

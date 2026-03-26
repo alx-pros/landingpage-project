@@ -38,12 +38,10 @@ function fadeVolume(iframe: HTMLIFrameElement | null, from: number, to: number, 
   const steps = 20;
   const stepTime = duration / steps;
   let current = from;
-
   const delta = (to - from) / steps;
 
   const interval = setInterval(() => {
     current += delta;
-
     postCommand(iframe, "setVolume", [Math.max(0, Math.min(100, current))]);
 
     if ((delta > 0 && current >= to) || (delta < 0 && current <= to)) {
@@ -52,17 +50,21 @@ function fadeVolume(iframe: HTMLIFrameElement | null, from: number, to: number, 
   }, stepTime);
 }
 
-export default function MusicToggle() {
+export default function MusicToggle({
+  isPlaying,
+  onToggle,
+}: {
+  isPlaying: boolean;
+  onToggle: () => void;
+}) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
   const [isReady, setIsReady] = useState(false);
   const videoId = useMemo(() => extractYouTubeVideoId(musicConfig.youtubeUrl), []);
-
-  // Define unique heights for each bar to create a "mountain" shape
   const barHeights = [12, 14, 18, 16, 12, 14];
 
   useEffect(() => {
     if (!isReady) return;
+
     if (isPlaying) {
       postCommand(iframeRef.current, "playVideo");
       fadeVolume(iframeRef.current, 0, 100, 1000);
@@ -81,26 +83,21 @@ export default function MusicToggle() {
         name="music button"
         aria-label="music button"
         disabled={disabled}
-        onClick={() => !disabled && setIsPlaying(!isPlaying)}
-        className="cursor-pointer flex h-9 w-9 items-center justify-center rounded-full border border-[#0d8c6a] bg-[#0BC6B4] hover:bg-[#0BC6B4]/30 text-white shadow-lg backdrop-blur-md transition-all"
+        onClick={() => !disabled && onToggle()}
+        className="cursor-pointer flex h-9 w-9 items-center justify-center rounded-full border border-[#0d8c6a] bg-[#0BC6B4] hover:bg-[#0BC6B4]/30 text-white shadow-lg backdrop-blur-md transition-all focus-within:ring-3 focus-within:ring-[#0BC6B4] focus-within:border-[#0d8c6a] focus-within:outline-none"
       >
-        <span className="flex items-center gap-[3px] h-[32px]">
+        <span className="flex h-[32px] items-center gap-[3px]">
           {barHeights.map((height, i) => (
             <span
               key={i}
-              className="block w-[1px] bg-white rounded-full transition-all duration-500 ease-in-out"
+              className="block w-[1px] rounded-full bg-white transition-all duration-500 ease-in-out"
               style={{
-                // 1. Initial State (The Dot)
                 height: isPlaying ? `${height}px` : "3px",
-
-                // 2. Separate Properties to avoid shorthand conflicts
                 animationName: isPlaying ? "waveform" : "none",
                 animationDuration: `${0.8 + i * 0.1}s`,
                 animationTimingFunction: "linear",
                 animationIterationCount: "infinite",
                 animationDelay: `${i * 0.15}s`,
-
-                // 3. Transform & Origin
                 transformOrigin: "center",
                 opacity: isPlaying ? 1 : 0.6,
               }}

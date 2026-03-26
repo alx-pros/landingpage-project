@@ -9,8 +9,9 @@ import { getSceneDate, sceneParams } from "./sceneParams";
 import { getSceneSnapshot, vecFromSpherical } from "./timeUtils";
 
 interface EncounterSet {
-  turtleSeed: number;
-  dolphinSeed: number;
+  dolphinSeedA: number;
+  dolphinSeedB: number;
+  dolphinSeedC: number;
   whaleSeed: number;
 }
 
@@ -28,24 +29,22 @@ interface ObstacleArea {
 }
 
 interface MarineMotionConfig {
+  behavior: "dolphin" | "whale";
   radiusRange: [number, number];
   angleRange: [number, number];
   depthRange: [number, number];
   speedRange: [number, number];
   targetInterval: [number, number];
   avoidanceRadius: number;
+  socialDistance: number;
   turnSpeed: number;
   bankFactor: number;
   pitchFactor: number;
   swayAmount: number;
   swaySpeed: number;
   animationSpeedRange: [number, number];
-  jumpInterval?: [number, number];
-  jumpDuration?: [number, number];
-  jumpHeight?: number;
-  tailLiftInterval?: [number, number];
-  tailLiftDuration?: [number, number];
-  tailLiftHeight?: number;
+  actionInterval: [number, number];
+  actionDuration: [number, number];
 }
 
 interface MarineMotionState {
@@ -54,10 +53,17 @@ interface MarineMotionState {
   target: THREE.Vector3;
   speed: number;
   retargetAt: number;
-  jumpAt: number;
-  jumpDuration: number;
-  tailLiftAt: number;
-  tailLiftDuration: number;
+  actionAt: number;
+  actionDuration: number;
+  actionStyle: number;
+}
+
+interface SurfaceAction {
+  visible: boolean;
+  lift: number;
+  pitch: number;
+  roll: number;
+  yaw: number;
 }
 
 function lerp(a: number, b: number, t: number) {
@@ -81,6 +87,10 @@ function createSeededRandom(seed: number) {
 
 function randomRange(random: () => number, min: number, max: number) {
   return lerp(min, max, random());
+}
+
+function randomIndex(random: () => number, max: number) {
+  return Math.floor(random() * max);
 }
 
 function horizontalDistance(a: THREE.Vector3, b: THREE.Vector3) {
@@ -111,11 +121,12 @@ function getRandomValues(count: number) {
 }
 
 function createEncounterSet(): EncounterSet {
-  const values = getRandomValues(3);
+  const values = getRandomValues(4);
   return {
-    turtleSeed: values[0],
-    dolphinSeed: values[1],
-    whaleSeed: values[2],
+    dolphinSeedA: values[0],
+    dolphinSeedB: values[1],
+    dolphinSeedC: values[2],
+    whaleSeed: values[3],
   };
 }
 
@@ -216,7 +227,7 @@ const CLIFF_GROUP_TUNING_2: MaterialTuning = {
   envMapIntensity: 1.08,
   roughness: 0.34,
   metalness: 0,
-  colorBoost: 1.7,
+  colorBoost: 1.3,
   emissiveBoost: 1.04,
 };
 
@@ -236,55 +247,42 @@ const CREATURE_OBSTACLES: ObstacleArea[] = [
   { position: frontArcPosition(900, 180, -3), radius: 280 },
 ];
 
-const TURTLE_MOTION: MarineMotionConfig = {
-  radiusRange: [180, 980],
-  angleRange: [24, 336],
-  depthRange: [-14.45, -14.55],
-  speedRange: [18, 28],
-  targetInterval: [7, 14],
-  avoidanceRadius: 220,
-  turnSpeed: 2.2,
-  bankFactor: 0.014,
-  pitchFactor: 0.2,
-  swayAmount: 0.12,
-  swaySpeed: 0.9,
-  animationSpeedRange: [0.8, 1.08],
-};
-
 const DOLPHIN_MOTION: MarineMotionConfig = {
+  behavior: "dolphin",
   radiusRange: [220, 1_350],
   angleRange: [20, 340],
-  depthRange: [-10.34, -10.06],
-  speedRange: [36, 58],
-  targetInterval: [5, 10],
+  depthRange: [-0.42, -0.08],
+  speedRange: [34, 58],
+  targetInterval: [4.5, 10],
   avoidanceRadius: 260,
-  turnSpeed: 3.1,
-  bankFactor: 0.012,
-  pitchFactor: 0.22,
+  socialDistance: 170,
+  turnSpeed: 3.2,
+  bankFactor: 0.013,
+  pitchFactor: 0.24,
   swayAmount: 0.08,
-  swaySpeed: 1.4,
+  swaySpeed: 1.55,
   animationSpeedRange: [0.96, 1.24],
-  jumpInterval: [6, 13],
-  jumpDuration: [1.15, 1.85],
-  jumpHeight: 2.9,
+  actionInterval: [5.5, 12],
+  actionDuration: [1.1, 2],
 };
 
 const WHALE_MOTION: MarineMotionConfig = {
+  behavior: "whale",
   radiusRange: [520, 1_950],
   angleRange: [30, 330],
-  depthRange: [-14.95, -14.68],
+  depthRange: [-1.95, -0.72],
   speedRange: [18, 34],
   targetInterval: [10, 18],
   avoidanceRadius: 340,
+  socialDistance: 250,
   turnSpeed: 1.7,
   bankFactor: 0.008,
   pitchFactor: 0.13,
   swayAmount: 0.06,
   swaySpeed: 0.55,
   animationSpeedRange: [0.62, 0.88],
-  tailLiftInterval: [12, 22],
-  tailLiftDuration: [2.6, 4.2],
-  tailLiftHeight: 1.18,
+  actionInterval: [12, 22],
+  actionDuration: [2.6, 4.4],
 };
 
 function chooseCreatureTarget(random: () => number, config: MarineMotionConfig) {
@@ -295,7 +293,9 @@ function chooseCreatureTarget(random: () => number, config: MarineMotionConfig) 
     const position = frontArcPosition(radius, angle, depth);
 
     const nearObstacle = CREATURE_OBSTACLES.some((obstacle) => {
-      return horizontalDistance(position, obstacle.position) < obstacle.radius + config.avoidanceRadius;
+      return (
+        horizontalDistance(position, obstacle.position) < obstacle.radius + config.avoidanceRadius
+      );
     });
 
     if (!nearObstacle) {
@@ -320,7 +320,10 @@ function nearestObstacleDistance(position: THREE.Vector3) {
   return minDistance;
 }
 
-function createMarineMotionState(random: () => number, config: MarineMotionConfig): MarineMotionState {
+function createMarineMotionState(
+  random: () => number,
+  config: MarineMotionConfig
+): MarineMotionState {
   const position = chooseCreatureTarget(random, config);
   const target = chooseCreatureTarget(random, config);
   const speed = randomRange(random, config.speedRange[0], config.speedRange[1]);
@@ -332,14 +335,9 @@ function createMarineMotionState(random: () => number, config: MarineMotionConfi
     target,
     speed,
     retargetAt: randomRange(random, config.targetInterval[0], config.targetInterval[1]),
-    jumpAt: config.jumpInterval ? randomRange(random, config.jumpInterval[0], config.jumpInterval[1]) : Number.POSITIVE_INFINITY,
-    jumpDuration: config.jumpDuration ? randomRange(random, config.jumpDuration[0], config.jumpDuration[1]) : 0,
-    tailLiftAt: config.tailLiftInterval
-      ? randomRange(random, config.tailLiftInterval[0], config.tailLiftInterval[1])
-      : Number.POSITIVE_INFINITY,
-    tailLiftDuration: config.tailLiftDuration
-      ? randomRange(random, config.tailLiftDuration[0], config.tailLiftDuration[1])
-      : 0,
+    actionAt: randomRange(random, config.actionInterval[0], config.actionInterval[1]),
+    actionDuration: randomRange(random, config.actionDuration[0], config.actionDuration[1]),
+    actionStyle: randomIndex(random, config.behavior === "dolphin" ? 7 : 6),
   };
 }
 
@@ -371,6 +369,113 @@ function useClipPlayback(
       action.stop();
     };
   }, [actions, animations, playbackRandom, speedRange]);
+}
+
+function getDolphinAction(style: number, progress: number): SurfaceAction {
+  const arc = Math.sin(progress * Math.PI);
+
+  switch (style) {
+    case 0:
+      return {
+        visible: arc > 0.03,
+        lift: arc * 3.1,
+        pitch: lerp(-0.82, 0.42, progress),
+        roll: 0,
+        yaw: 0,
+      };
+    case 1:
+      return {
+        visible: arc > 0.03,
+        lift: arc * 2.35,
+        pitch: -0.05,
+        roll: progress * Math.PI * 4.6,
+        yaw: 0,
+      };
+    case 2:
+      return {
+        visible: arc > 0.03,
+        lift: arc * 1.7,
+        pitch: lerp(-0.32, 0.58, progress),
+        roll: 0,
+        yaw: 0,
+      };
+    case 3: {
+      const slapArc = progress < 0.52 ? Math.sin((progress / 0.52) * Math.PI) : 0;
+      return { visible: slapArc > 0.03, lift: slapArc * 1.15, pitch: 0.62, roll: 0, yaw: 0 };
+    }
+    case 4: {
+      const porpoise = Math.max(0, Math.sin(progress * Math.PI * 3.8)) * 0.75;
+      return {
+        visible: porpoise > 0.03,
+        lift: porpoise,
+        pitch: 0.12 + Math.sin(progress * Math.PI * 2) * 0.16,
+        roll: 0,
+        yaw: 0,
+      };
+    }
+    case 5:
+      return {
+        visible: arc > 0.03,
+        lift: arc * 1.95,
+        pitch: lerp(-0.46, 0.12, progress),
+        roll: Math.sin(progress * Math.PI) * 1.18,
+        yaw: 0,
+      };
+    default:
+      return {
+        visible: arc > 0.03,
+        lift: arc * 2.2,
+        pitch: progress * Math.PI * 2 - 0.9,
+        roll: 0,
+        yaw: 0,
+      };
+  }
+}
+
+function getWhaleAction(style: number, progress: number): SurfaceAction {
+  const arc = Math.sin(progress * Math.PI);
+
+  switch (style) {
+    case 0:
+      return {
+        visible: true,
+        lift: arc * 3.25,
+        pitch: lerp(-0.7, 0.35, progress),
+        roll: 0,
+        yaw: 0,
+      };
+    case 1:
+      return {
+        visible: true,
+        lift: arc * 1.75,
+        pitch: lerp(-0.4, 0.14, progress),
+        roll: 0,
+        yaw: 0,
+      };
+    case 2:
+      return {
+        visible: true,
+        lift: arc * 2.35,
+        pitch: lerp(-0.5, 0.2, progress),
+        roll: Math.sin(progress * Math.PI) * 0.86,
+        yaw: Math.sin(progress * Math.PI) * 0.18,
+      };
+    case 3:
+      return {
+        visible: true,
+        lift: arc * 2.05,
+        pitch: lerp(-0.44, 0.06, progress),
+        roll: lerp(0, 1.1, progress),
+        yaw: 0,
+      };
+    case 4: {
+      const headArc =
+        progress < 0.58 ? Math.sin((progress / 0.58) * Math.PI) : Math.max(0, 1 - progress) * 0.7;
+      return { visible: true, lift: headArc * 2.3, pitch: -0.76, roll: 0, yaw: 0 };
+    }
+    default:
+      return { visible: true, lift: arc * 0.98, pitch: 0.68, roll: 0, yaw: 0 };
+  }
 }
 
 function EncounterLightRig() {
@@ -430,7 +535,11 @@ function EncounterLightRig() {
     hemiLightRef.current.groundColor.setHex(0x092236);
 
     ambientLightRef.current.color.setHex(scene.lightColorHex);
-    ambientLightRef.current.intensity = THREE.MathUtils.lerp(0.12, 0.34, 1 - scene.nightFactor * 0.4);
+    ambientLightRef.current.intensity = THREE.MathUtils.lerp(
+      0.12,
+      0.34,
+      1 - scene.nightFactor * 0.4
+    );
   });
 
   return (
@@ -513,15 +622,19 @@ function RockReefEncounter() {
 }
 
 function MarineCreatureEncounter({
+  id,
   url,
   seed,
   scale,
   config,
+  sharedPositionsRef,
 }: {
+  id: string;
   url: string;
   seed: number;
   scale: number;
   config: MarineMotionConfig;
+  sharedPositionsRef: React.MutableRefObject<Record<string, THREE.Vector3>>;
 }) {
   const groupRef = useRef<THREE.Group>(null);
   const { model, animations } = useAnimatedClonedModel(url, CREATURE_TUNING);
@@ -530,8 +643,15 @@ function MarineCreatureEncounter({
   const desiredVelocityRef = useRef(new THREE.Vector3());
   const avoidanceRef = useRef(new THREE.Vector3());
   const awayRef = useRef(new THREE.Vector3());
+  const sideRef = useRef(new THREE.Vector3());
 
   useClipPlayback(model, animations, seed, config.animationSpeedRange);
+
+  useEffect(() => {
+    return () => {
+      delete sharedPositionsRef.current[id];
+    };
+  }, [id, sharedPositionsRef]);
 
   if (!motionRef.current) {
     motionRef.current = createMarineMotionState(random, config);
@@ -547,7 +667,8 @@ function MarineCreatureEncounter({
     if (elapsed >= motion.retargetAt || closeToTarget) {
       motion.target.copy(chooseCreatureTarget(random, config));
       motion.speed = randomRange(random, config.speedRange[0], config.speedRange[1]);
-      motion.retargetAt = elapsed + randomRange(random, config.targetInterval[0], config.targetInterval[1]);
+      motion.retargetAt =
+        elapsed + randomRange(random, config.targetInterval[0], config.targetInterval[1]);
     }
 
     desiredVelocityRef.current.copy(motion.target).sub(motion.position);
@@ -558,6 +679,11 @@ function MarineCreatureEncounter({
       desiredVelocityRef.current.set(0, 0, -motion.speed);
     }
 
+    const stroke = Math.sin(elapsed * (config.swaySpeed * 2.9) + seed * 0.00031);
+    const swimPulse =
+      config.behavior === "dolphin" ? 0.8 + Math.max(0, stroke) * 0.34 : 0.9 + stroke * 0.12;
+    desiredVelocityRef.current.multiplyScalar(swimPulse);
+
     avoidanceRef.current.set(0, 0, 0);
 
     for (const obstacle of CREATURE_OBSTACLES) {
@@ -565,10 +691,7 @@ function MarineCreatureEncounter({
       const clearance = obstacle.radius + config.avoidanceRadius;
 
       if (distance < clearance) {
-        awayRef.current
-          .copy(motion.position)
-          .sub(obstacle.position)
-          .setY(0);
+        awayRef.current.copy(motion.position).sub(obstacle.position).setY(0);
 
         if (awayRef.current.lengthSq() < 0.001) {
           awayRef.current.set(1, 0, 0);
@@ -576,7 +699,7 @@ function MarineCreatureEncounter({
 
         awayRef.current
           .normalize()
-          .multiplyScalar(((clearance - distance) / clearance) * motion.speed * 1.8);
+          .multiplyScalar(((clearance - distance) / clearance) * motion.speed * 1.9);
 
         avoidanceRef.current.add(awayRef.current);
 
@@ -586,12 +709,32 @@ function MarineCreatureEncounter({
       }
     }
 
-    desiredVelocityRef.current.add(avoidanceRef.current);
-    if (desiredVelocityRef.current.lengthSq() > 0.001) {
-      desiredVelocityRef.current.setLength(motion.speed);
+    for (const [otherId, otherPosition] of Object.entries(sharedPositionsRef.current)) {
+      if (otherId === id) continue;
+
+      const distance = horizontalDistance(motion.position, otherPosition);
+      if (distance >= config.socialDistance) continue;
+
+      awayRef.current.copy(motion.position).sub(otherPosition).setY(0);
+      if (awayRef.current.lengthSq() < 0.001) {
+        awayRef.current.set(1, 0, 0);
+      }
+
+      awayRef.current
+        .normalize()
+        .multiplyScalar(
+          ((config.socialDistance - distance) / config.socialDistance) * motion.speed * 1.4
+        );
+
+      avoidanceRef.current.add(awayRef.current);
     }
 
-    motion.velocity.lerp(desiredVelocityRef.current, Math.min(1, delta * 1.25));
+    desiredVelocityRef.current.add(avoidanceRef.current);
+    if (desiredVelocityRef.current.lengthSq() > 0.001) {
+      desiredVelocityRef.current.setLength(motion.speed * swimPulse);
+    }
+
+    motion.velocity.lerp(desiredVelocityRef.current, Math.min(1, delta * 1.35));
     motion.position.addScaledVector(motion.velocity, delta);
     motion.position.y = THREE.MathUtils.clamp(
       motion.position.y,
@@ -599,81 +742,84 @@ function MarineCreatureEncounter({
       config.depthRange[1]
     );
 
-    let surfaceLift = Math.sin(elapsed * config.swaySpeed + seed * 0.0003) * config.swayAmount;
+    let surfaceLift = Math.sin(elapsed * config.swaySpeed + seed * 0.00027) * config.swayAmount;
     let pitchOffset = 0;
+    let rollOffset = 0;
+    let yawOffset = 0;
+    let creatureVisible = true;
 
-    if (
-      config.jumpInterval &&
-      config.jumpDuration &&
-      config.jumpHeight &&
-      nearestObstacleDistance(motion.position) > config.avoidanceRadius + 140
-    ) {
-      const jumpProgress = (elapsed - motion.jumpAt) / motion.jumpDuration;
+    const actionProgress = (elapsed - motion.actionAt) / motion.actionDuration;
+    const canPerformAction =
+      nearestObstacleDistance(motion.position) > config.avoidanceRadius + 140;
 
-      if (jumpProgress >= 0 && jumpProgress <= 1) {
-        const arc = Math.sin(jumpProgress * Math.PI);
-        surfaceLift += arc * config.jumpHeight;
-        pitchOffset += THREE.MathUtils.lerp(-0.68, 0.32, jumpProgress);
-      } else if (jumpProgress > 1) {
-        motion.jumpDuration = randomRange(random, config.jumpDuration[0], config.jumpDuration[1]);
-        motion.jumpAt = elapsed + randomRange(random, config.jumpInterval[0], config.jumpInterval[1]);
-      }
+    if (canPerformAction && actionProgress >= 0 && actionProgress <= 1) {
+      const action =
+        config.behavior === "dolphin"
+          ? getDolphinAction(motion.actionStyle, actionProgress)
+          : getWhaleAction(motion.actionStyle, actionProgress);
+
+      creatureVisible = action.visible;
+      surfaceLift += action.lift;
+      pitchOffset += action.pitch;
+      rollOffset += action.roll;
+      yawOffset += action.yaw;
+    } else if (actionProgress > 1) {
+      motion.actionDuration = randomRange(
+        random,
+        config.actionDuration[0],
+        config.actionDuration[1]
+      );
+      motion.actionAt =
+        elapsed + randomRange(random, config.actionInterval[0], config.actionInterval[1]);
+      motion.actionStyle = randomIndex(random, config.behavior === "dolphin" ? 7 : 6);
+    } else if (config.behavior === "dolphin") {
+      creatureVisible = false;
     }
 
-    if (
-      config.tailLiftInterval &&
-      config.tailLiftDuration &&
-      config.tailLiftHeight &&
-      nearestObstacleDistance(motion.position) > config.avoidanceRadius + 180
-    ) {
-      const tailProgress = (elapsed - motion.tailLiftAt) / motion.tailLiftDuration;
-
-      if (tailProgress >= 0 && tailProgress <= 1) {
-        const lift = Math.sin(tailProgress * Math.PI);
-        surfaceLift += lift * config.tailLiftHeight;
-        pitchOffset += lift * 0.42;
-      } else if (tailProgress > 1) {
-        motion.tailLiftDuration = randomRange(
-          random,
-          config.tailLiftDuration[0],
-          config.tailLiftDuration[1]
-        );
-        motion.tailLiftAt =
-          elapsed + randomRange(random, config.tailLiftInterval[0], config.tailLiftInterval[1]);
-      }
-    }
+    groupRef.current.visible = creatureVisible;
 
     groupRef.current.position.copy(motion.position);
+
+    sideRef.current.set(-motion.velocity.z, 0, -motion.velocity.x);
+    if (sideRef.current.lengthSq() > 0.001) {
+      sideRef.current.normalize().multiplyScalar(stroke * config.swayAmount * 0.6);
+      groupRef.current.position.add(sideRef.current);
+    }
+
     groupRef.current.position.y += surfaceLift;
 
     const heading = Math.atan2(motion.velocity.x, -motion.velocity.z);
     groupRef.current.rotation.y = lerpAngle(
       groupRef.current.rotation.y,
-      heading,
+      heading + yawOffset,
       Math.min(1, delta * config.turnSpeed)
     );
 
     const bankTarget = THREE.MathUtils.clamp(
-      -motion.velocity.x * config.bankFactor,
-      -0.28,
-      0.28
+      -motion.velocity.x * config.bankFactor + rollOffset,
+      -Math.PI,
+      Math.PI
     );
     const pitchTarget = THREE.MathUtils.clamp(
       motion.velocity.y * config.pitchFactor + pitchOffset,
-      -0.5,
-      0.55
+      -Math.PI,
+      Math.PI
     );
 
     groupRef.current.rotation.z = THREE.MathUtils.lerp(
       groupRef.current.rotation.z,
       bankTarget,
-      Math.min(1, delta * 2.2)
+      Math.min(1, delta * 2.3)
     );
     groupRef.current.rotation.x = THREE.MathUtils.lerp(
       groupRef.current.rotation.x,
       pitchTarget,
-      Math.min(1, delta * 2)
+      Math.min(1, delta * 2.1)
     );
+
+    const registry = sharedPositionsRef.current[id] ?? new THREE.Vector3();
+    registry.copy(groupRef.current.position);
+    sharedPositionsRef.current[id] = registry;
   });
 
   return (
@@ -685,6 +831,7 @@ function MarineCreatureEncounter({
 
 export default function SceneEncounters() {
   const [encounter] = useState<EncounterSet>(() => createEncounterSet());
+  const sharedPositionsRef = useRef<Record<string, THREE.Vector3>>({});
 
   return (
     <>
@@ -698,22 +845,36 @@ export default function SceneEncounters() {
       <RockReefEncounter />
 
       <MarineCreatureEncounter
-        url="/models/turtle.glb"
-        seed={encounter.turtleSeed}
-        scale={30.15}
-        config={TURTLE_MOTION}
-      />
-      <MarineCreatureEncounter
+        id="dolphin-a"
         url="/models/dolphin.glb"
-        seed={encounter.dolphinSeed}
-        scale={30.95}
+        seed={encounter.dolphinSeedA}
+        scale={5.95}
         config={DOLPHIN_MOTION}
+        sharedPositionsRef={sharedPositionsRef}
       />
       <MarineCreatureEncounter
+        id="dolphin-b"
+        url="/models/dolphin.glb"
+        seed={encounter.dolphinSeedB}
+        scale={5.88}
+        config={DOLPHIN_MOTION}
+        sharedPositionsRef={sharedPositionsRef}
+      />
+      <MarineCreatureEncounter
+        id="dolphin-c"
+        url="/models/dolphin.glb"
+        seed={encounter.dolphinSeedC}
+        scale={5.82}
+        config={DOLPHIN_MOTION}
+        sharedPositionsRef={sharedPositionsRef}
+      />
+      <MarineCreatureEncounter
+        id="whale"
         url="/models/blue_whale.glb"
         seed={encounter.whaleSeed}
-        scale={10.82}
+        scale={5.82}
         config={WHALE_MOTION}
+        sharedPositionsRef={sharedPositionsRef}
       />
     </>
   );
@@ -725,6 +886,5 @@ useGLTF.preload("/models/group_of_cliff_1.glb");
 useGLTF.preload("/models/group_of_cliff_2.glb");
 useGLTF.preload("/models/volcano.glb");
 useGLTF.preload("/models/rock_reef.glb");
-useGLTF.preload("/models/turtle.glb");
 useGLTF.preload("/models/dolphin.glb");
 useGLTF.preload("/models/blue_whale.glb");

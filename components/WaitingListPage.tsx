@@ -6,6 +6,7 @@ import MusicToggle from "./MusicToggle";
 import Link from "next/link";
 import SceneTimePanel from "./SceneTimePanel";
 import { Logo } from "@/public/Logo";
+import { AnimatePresence, motion } from "framer-motion";
 
 const OceanCanvas = dynamic(() => import("@/components/OceanCavas"), {
   ssr: false,
@@ -224,7 +225,7 @@ function WaitlistForm({
       </div>
       <button
         type="submit"
-        className={`absolute right-0 uppercase text-black tracking-widest bg-[#0BC6B4] hover:bg-[#0BC6B4]/30 rounded-tr-xl border-l border-[#0d8c6a] rounded-br-xl top-1/2 -translate-y-1/2 z-20 cursor-pointer flex items-center gap-2 px-3 sm:px-6 py-3.5 text-sm font-medium transition ${submitted ? "cursor-text" : ""}`}
+        className={`absolute right-0 uppercase text-black tracking-widest bg-[#0BC6B4] hover:bg-[#0BC6B4]/30 rounded-tr-xl border-l border-[#0d8c6a] rounded-br-xl top-1/2 -translate-y-1/2 z-20 cursor-pointer flex items-center gap-2 px-3 sm:px-6 py-3.5 text-sm font-medium transition focus-within:ring-3 focus-within:ring-transparent focus-within:border-[#0d8c6a] focus-within:outline-none ${submitted ? "cursor-text" : ""}`}
       >
         {submitted ? "Thank you!" : <p>Reserve a spot</p>}
       </button>
@@ -236,6 +237,7 @@ export default function WaitlistPage() {
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [timeOverrideHour, setTimeOverrideHour] = useState<number | null>(null);
   const [clockNow, setClockNow] = useState(() => new Date());
+  const [isMusicPlaying, setIsMusicPlaying] = useState(false);
 
   useEffect(() => {
     setCurrentYear(new Date().getFullYear());
@@ -256,66 +258,92 @@ export default function WaitlistPage() {
       <OceanCanvas timeOverrideHour={timeOverrideHour} />
       <div className="fixed inset-0 z-10 pointer-events-none ocean-veil" />
 
-      <nav className="fixed min-w-[320px] top-0 inset-x-0 z-20 flex justify-between items-center px-2 sm:px-10 py-8 animate-fade-down">
-        <span className="font-display text-[0.92rem] font-bold tracking-[0.28em] uppercase text-[#0BC6B4] text-ocean">
-          <div className="flex items-center justify-center gap-2">
-            <Logo />
-            DeepWave
-          </div>
-        </span>
-        <div className="flex items-center gap-2">
-          <div className="rounded-full border border-[#0d8c6a] bg-[#0BC6B4] text-white shadow-lg backdrop-blur-md transition-all text-sm px-3 py-1.5 h-9 font-mono tracking-[0.18em]">
-            {displayedSceneTime}
-          </div>
-          <MusicToggle />
-        </div>
-      </nav>
-
-      <main className="fixed min-w-[320px] inset-0 z-20 flex flex-col items-center justify-center px-6 text-center pointer-events-none">
-        <div className="inline-flex items-center gap-2.5 mb-6 animate-fade-up [animation-delay:350ms] pointer-events-auto">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#0BC6B4] glow-dot animate-pulse-dot" />
-          <span className="font-body text-[0.67rem] tracking-[0.32em] uppercase text-[#0BC6B4] text-ocean">
-            Early access open
+      {/* 2. THE SCROLLABLE CONTENT LAYER */}
+      {/* This wrapper provides the height and flex layout for the UI */}
+      <div className="relative z-20 flex flex-col w-full min-h-screen pointer-events-none">
+        {/* NAV */}
+        <nav className="relative flex mx-auto justify-between items-center px-5 sm:px-10 py-8 animate-fade-down w-full min-w-[320px] max-w-[1024px] pointer-events-auto">
+          <span className="font-display text-[0.92rem] font-bold tracking-[0.28em] uppercase text-[#0BC6B4] text-ocean">
+            <div className="flex items-center justify-center gap-1 sm:gap-2">
+              <Logo />
+              <p className="hidden sm:block text-lg">DeepWave</p>
+            </div>
           </span>
-        </div>
-        <h1 className="font-display text-[clamp(2.5rem,6.5vw,4.2rem)] font-normal leading-[1.07] tracking-tight mb-5 max-w-2xl text-ocean animate-fade-up [animation-delay:500ms]">
-          The future of <br />
-          <em className="text-[#0BC6B4] italic">Deep Focus</em>
-          <br />
-          is setting sail.
-        </h1>
-        <label
-          htmlFor="email"
-          className="font-body text-[1.12rem] font-light leading-relaxed text-white/55 max-w-sm mb-9 text-ocean animate-fade-up [animation-delay:650ms]"
-        >
-          A focused workspace for makers, writers, and builders who crave clarity. Built on calm.{" "}
-          <span className="whitespace-nowrap">Launching soon.</span>
-        </label>
-        <div className="w-full max-w-md pointer-events-auto animate-rise-in [animation-delay:800ms]">
-          <WaitlistForm placeholder="your@email.com" className="w-full" id="email" />
-          <p className="mt-4 text-[0.68rem] tracking-[0.1em] uppercase text-white/20 text-ocean">
-            No spam — just one note when we open the hatch.
-          </p>
-        </div>
-      </main>
-      <footer className="fixed min-w-[320px] bottom-0 inset-x-0 z-20 justify-between items-center px-5 sm:px-10 py-8 animate-fade-down">
-        <div className="flex flex-col sm:flex-row w-full items-center sm:justify-between gap-2">
-          <p className="text-left text-sm leading-normal text-white">
-            © {currentYear} DeepWave. All rights reserved.
-          </p>
-          <p className="text-left text-sm leading-normal text-white">
-            Designed and Developed by&nbsp;
-            <Link
-              href="https://alxpro.com"
-              target="_blank"
-              className="font-black text-[#0BC6B4] hover:underline"
-            >
-              AlxPro
-            </Link>
-          </p>
-        </div>
-      </footer>
-      <SceneTimePanel value={timeOverrideHour} onChange={setTimeOverrideHour} />
+          <div className="flex items-center gap-3">
+            <SceneTimePanel
+              value={timeOverrideHour}
+              onChange={setTimeOverrideHour}
+              label={displayedSceneTime}
+            />
+            <MusicToggle
+              isPlaying={isMusicPlaying}
+              onToggle={() => setIsMusicPlaying((playing) => !playing)}
+            />
+          </div>
+        </nav>
+
+        {/* MAIN */}
+        <main className="relative flex-1 flex mx-auto flex-col items-center justify-center px-6 py-5 sm:py-10 text-center pointer-events-none w-full min-w-[320px] max-w-[1024px]">
+          <AnimatePresence>
+            {!isMusicPlaying && (
+              <motion.div
+                key="hero-copy"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 16, filter: "blur(12px)" }}
+                transition={{ duration: 0.45, ease: "easeInOut" }}
+                className="flex flex-col items-center"
+              >
+                <div className="inline-flex items-center gap-2.5 mb-6 animate-fade-up [animation-delay:350ms] pointer-events-auto">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#0BC6B4] glow-dot animate-pulse-dot" />
+                  <span className="font-body text-[0.67rem] tracking-[0.32em] uppercase text-[#0BC6B4] text-ocean">
+                    Early access open
+                  </span>
+                </div>
+                <h1 className="font-display text-[clamp(2.5rem,6.5vw,4.2rem)] font-normal leading-[1.07] tracking-tight mb-5 max-w-2xl text-ocean animate-fade-up [animation-delay:500ms]">
+                  The future of <br />
+                  <em className="text-[#0BC6B4] italic">Deep Focus</em>
+                  <br />
+                  is setting sail.
+                </h1>
+                <label
+                  htmlFor="email"
+                  className="font-body text-[1.12rem] font-light leading-relaxed text-white/55 max-w-sm mb-9 text-ocean animate-fade-up [animation-delay:650ms]"
+                >
+                  A focused workspace for makers, writers, and builders who crave clarity. Built on
+                  calm. <span className="whitespace-nowrap">Launching soon.</span>
+                </label>
+                <div className="w-full max-w-md pointer-events-auto animate-rise-in [animation-delay:800ms]">
+                  <WaitlistForm placeholder="your@email.com" className="w-full" id="email" />
+                  <p className="mt-4 text-[0.68rem] tracking-[0.1em] uppercase text-white/20 text-ocean">
+                    No spam — just one note when we open{" "}
+                    <span className="whitespace-nowrap">the hatch</span>.
+                  </p>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </main>
+
+        {/* FOOTER */}
+        <footer className="relative flex mx-auto flex-col sm:flex-row justify-between items-center px-5 sm:px-10 py-8 animate-fade-down w-full min-w-[320px] max-w-[1024px] pointer-events-auto">
+          <div className="flex flex-col sm:flex-row w-full items-center sm:justify-between gap-2">
+            <p className="text-left text-sm leading-normal text-white">
+              © {currentYear} DeepWave. All rights reserved.
+            </p>
+            <p className="text-left text-sm leading-normal text-white">
+              Designed and Developed by&nbsp;
+              <Link
+                href="https://alxpro.com"
+                target="_blank"
+                className="font-black text-[#0BC6B4] hover:underline focus-within:rounded focus-within:ring-3 focus-within:ring-[#0BC6B4] focus-within:border-[#0d8c6a] focus-within:outline-none"
+              >
+                AlxPro
+              </Link>
+            </p>
+          </div>
+        </footer>
+      </div>
     </>
   );
 }

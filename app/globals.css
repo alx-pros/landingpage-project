@@ -59,9 +59,10 @@
 /* Body and html must be ink-dark — the canvas sits on top of this. */
 html,
 body {
-  height: 100%;
-  background-color: #03070f;  /* --color-ink */
+  min-height: 100vh;
+  background-color: #03070f;
   color: #ffffff;
+  overflow-x: hidden;
 }
 
 /* ── Wave animation for the MusicToggle ── */
