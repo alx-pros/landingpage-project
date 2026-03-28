@@ -1,0 +1,30 @@
+# DeepWave robots.txt
+# https://www.robotstxt.org/
+
+User-agent: *
+Allow: /
+
+# Disallow specific paths if needed
+Disallow: /api/
+Disallow: /.next/
+Disallow: /node_modules/
+Disallow: /_next/
+
+# Allow indexing of public pages
+Allow: /
+
+# Sitemaps
+Sitemap: https://deepwave.app/sitemap.xml
+
+# Crawl-delay for performance (in seconds)
+Crawl-delay: 1
+
+# Request-rate for Google Bot (requests per second)
+User-agent: Googlebot
+Allow: /
+Crawl-delay: 0.5
+
+# Request-rate for Bing Bot
+User-agent: Bingbot
+Allow: /
+Crawl-delay: 1

@@ -1,23 +1,21 @@
-'use client'
+"use client";
 
-import { Suspense, useEffect, useMemo, useRef } from 'react'
-import { useFrame, useThree } from '@react-three/fiber'
-import { OrbitControls } from '@react-three/drei'
-import { Sky as SkyImpl } from 'three/examples/jsm/objects/Sky.js'
-import * as THREE from 'three'
-import Ocean from './Ocean'
-import SceneEncounters from './SceneEncounters'
-import { getSceneDate, sceneParams } from './sceneParams'
-import {
-  getSceneSnapshot,
-  type SceneSnapshot,
-  vecFromSpherical,
-} from './timeUtils'
+import { Suspense, useEffect, useMemo, useRef, type ReactNode } from "react";
+import { useFrame, useThree } from "@react-three/fiber";
+import { OrbitControls } from "@react-three/drei";
+import { Sky as SkyImpl } from "three/examples/jsm/objects/Sky.js";
+import * as THREE from "three";
+import Ocean from "./Ocean";
+import SceneEncounters from "./SceneEncounters";
+import { getSceneDate, sceneParams } from "./sceneParams";
+import { getSceneSnapshot, type SceneSnapshot, vecFromSpherical } from "./timeUtils";
 
 interface SphericalPoint {
-  elevation: number
-  azimuth: number
+  elevation: number;
+  azimuth: number;
 }
+
+const SKY_OBJECT_LAYER = 1;
 
 const CONSTELLATION_SETS = [
   {
@@ -30,17 +28,47 @@ const CONSTELLATION_SETS = [
       { elevation: 13.3, azimuth: 361.3 },
       { elevation: 15.4, azimuth: 364 },
     ],
-    segments: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6]],
+    segments: [
+      [0, 1],
+      [1, 2],
+      [2, 3],
+      [3, 4],
+      [4, 5],
+      [5, 6],
+    ],
   },
   {
     stars: [
-      { elevation: 9.8, azimuth: 332.7 },
-      { elevation: 10.6, azimuth: 332 },
-      { elevation: 13, azimuth: 330.7 },
-      { elevation: 13.9, azimuth: 327.4 },
-      { elevation: 15.5, azimuth: 327.8 },
+      { elevation: 8.3, azimuth: 332.3 },
+      { elevation: 9.2, azimuth: 331.5 },
+      { elevation: 14, azimuth: 331 },
+      { elevation: 18.8, azimuth: 332 },
+      { elevation: 18.4, azimuth: 334.7 },
+      { elevation: 18, azimuth: 336.4 },
+      { elevation: 17.3, azimuth: 337.8 },
+      { elevation: 19.3, azimuth: 339.3 },
+      { elevation: 20.2, azimuth: 330.3 },
+      { elevation: 18, azimuth: 328 },
+      { elevation: 14.1, azimuth: 327.4 },
+      { elevation: 19.5, azimuth: 325 },
+      { elevation: 21.7, azimuth: 330.2 },
+      { elevation: 24.7, azimuth: 329.3 },
     ],
-    segments: [[0, 1], [1, 2], [2, 3], [3, 4]],
+    segments: [
+      [0, 1],
+      [0, 2],
+      [2, 3],
+      [3, 4],
+      [4, 5],
+      [5, 6],
+      [6, 7],
+      [3, 8],
+      [8, 9],
+      [9, 10],
+      [8, 11],
+      [8, 12],
+      [12, 13],
+    ],
   },
 
   // Ursa Minor
@@ -52,7 +80,12 @@ const CONSTELLATION_SETS = [
       { elevation: 24.5, azimuth: 18.9 },
       { elevation: 26.8, azimuth: 22.4 },
     ],
-    segments: [[0, 1], [1, 2], [2, 3], [3, 4]],
+    segments: [
+      [0, 1],
+      [1, 2],
+      [2, 3],
+      [3, 4],
+    ],
   },
 
   // Ursa Minor
@@ -62,7 +95,10 @@ const CONSTELLATION_SETS = [
       { elevation: 21.6, azimuth: 20.6 },
       { elevation: 22.3, azimuth: 16.2 },
     ],
-    segments: [[0, 1], [1, 2]],
+    segments: [
+      [0, 1],
+      [1, 2],
+    ],
   },
   {
     stars: [
@@ -75,179 +111,412 @@ const CONSTELLATION_SETS = [
       { elevation: 19.9, azimuth: 226.5 },
       { elevation: 23.5, azimuth: 224.8 },
     ],
-    segments: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 7]],
-  },
-
-  // Ursa Major
-  {
-    stars: [
-      { elevation: 9.3, azimuth: 160 },
-      { elevation: 10.3, azimuth: 159.23 },
-      { elevation: 13.8, azimuth: 164.9 },
-      { elevation: 15.7, azimuth: 171 },
-      { elevation: 14.8, azimuth: 177.2 },
-      { elevation: 11, azimuth: 176.8 },
-      { elevation: 14.2, azimuth: 182.8 },
-      { elevation: 11, azimuth: 178.2 },
-      { elevation: 14.2, azimuth: 182.8 },
-      { elevation: 18.7, azimuth: 184 },
-      { elevation: 19, azimuth: 182.2 },
-      { elevation: 20.7, azimuth: 185.8 },
-      { elevation: 24.3, azimuth: 185.5 },
-      { elevation: 13.9, azimuth: 187.8 },
-      { elevation: 11.6, azimuth: 187.6 },
-      { elevation: 9.5, azimuth: 187.3 },
-      { elevation: 7.9, azimuth: 186.3 },
-      { elevation: 13.4, azimuth: 190 },
-      { elevation: 12.5, azimuth: 190.6 },
-      { elevation: 8.9, azimuth: 191.9 },
-      { elevation: 7.9, azimuth: 191 },
-
+    segments: [
+      [0, 1],
+      [1, 2],
+      [2, 3],
+      [3, 4],
+      [4, 5],
+      [5, 6],
+      [6, 7],
     ],
-    segments: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [4, 6], [5, 7], [7, 8], [8, 9], [9, 10], [10, 11], [11, 12], [6, 13], [13, 14], [14, 15], [15, 16], [13, 17], [17, 18], [18, 19], [19, 20]],
   },
   {
     stars: [
-      { elevation: 16, azimuth: 126 },
-      { elevation: 19, azimuth: 136 },
-      { elevation: 22, azimuth: 146 },
-      { elevation: 18, azimuth: 157 },
-      { elevation: 13, azimuth: 166 },
-      { elevation: 11, azimuth: 176 },
+      { elevation: 13.2, azimuth: 163.8 },
+      { elevation: 13.5, azimuth: 166.8 },
+      { elevation: 14, azimuth: 173.8 },
+      { elevation: 12.7, azimuth: 173.5 },
+      { elevation: 10.8, azimuth: 173.2 },
+      { elevation: 8.7, azimuth: 175.3 },
+      { elevation: 13.6, azimuth: 174.9 },
+      { elevation: 14.4, azimuth: 179 },
+      { elevation: 13.8, azimuth: 184.6 },
+      { elevation: 15.4, azimuth: 172.9 },
+      { elevation: 16.8, azimuth: 175 },
+      { elevation: 18.8, azimuth: 176.4 },
+      { elevation: 20, azimuth: 178 },
+      { elevation: 21, azimuth: 177.8 },
     ],
-    segments: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5]],
+    segments: [
+      [0, 1],
+      [1, 2],
+      [2, 3],
+      [3, 4],
+      [4, 5],
+      [2, 6],
+      [6, 7],
+      [7, 8],
+      [2, 9],
+      [9, 10],
+      [10, 11],
+      [11, 12],
+      [12, 13],
+    ],
   },
   {
     stars: [
-      { elevation: 12, azimuth: 88 },
-      { elevation: 15, azimuth: 97 },
-      { elevation: 17, azimuth: 107 },
-      { elevation: 15, azimuth: 118 },
-      { elevation: 11, azimuth: 128 },
+      { elevation: 12.8, azimuth: 140.7 },
+      { elevation: 17.2, azimuth: 136.2 },
+      { elevation: 18.6, azimuth: 141 },
+      { elevation: 22.7, azimuth: 137.5 },
+      { elevation: 22, azimuth: 134.2 },
+      { elevation: 17.2, azimuth: 136.2 },
+      { elevation: 12.8, azimuth: 140.7 },
+    ],
+    segments: [
+      [0, 1],
+      [1, 2],
+      [2, 3],
+      [3, 4],
+      [4, 5],
+      [2, 6],
+    ],
+  },
+  {
+    stars: [
+      { elevation: 16.7, azimuth: 155.6 },
+      { elevation: 19.2, azimuth: 158.8 },
+      { elevation: 22.3, azimuth: 158.5 },
+      { elevation: 23.8, azimuth: 155.3 },
+      { elevation: 21, azimuth: 150.8 },
     ],
     segments: [[0, 1], [1, 2], [2, 3], [3, 4]],
   },
-] as const
+  {
+    stars: [
+      { elevation: 14, azimuth: 83.6 },
+      { elevation: 16.2, azimuth: 86.2 },
+      { elevation: 14.5, azimuth: 90.5 },
+      { elevation: 11.7, azimuth: 87.5 },
+      { elevation: 13.9, azimuth: 83.6 },
+      { elevation: 11.9, azimuth: 90 },
+      { elevation: 11.9, azimuth: 93.8 },
+      { elevation: 12.6, azimuth: 95.2 },
+      { elevation: 13.1, azimuth: 98.8 },
+      { elevation: 14.2, azimuth: 99.4 },
+      { elevation: 16.7, azimuth: 103 },
+      { elevation: 18.5, azimuth: 102.7 },
+    ],
+    segments: [
+      [0, 1],
+      [1, 2],
+      [2, 3],
+      [3, 4],
+      [3, 5],
+      [5, 6],
+      [6, 7],
+      [7, 8],
+      [8, 9],
+      [9, 10],
+      [10, 11],
+    ],
+  },
 
-const COMET_PATHS = [
+  // Andromeda pt. 1
   {
-    start: { elevation: 56, azimuth: 292 },
-    end: { elevation: 33, azimuth: 248 },
-    duration: 6.2,
-    delay: 2.6,
-    offset: 0.8,
+    stars: [
+      { elevation: 25.8, azimuth: 39.3 },
+      { elevation: 21.1, azimuth: 39.3 },
+      { elevation: 18.6, azimuth: 40.6 },
+      { elevation: 16, azimuth: 44.7 },
+      { elevation: 18.8, azimuth: 47.7 },
+      { elevation: 13.2, azimuth: 40.8 },
+    ],
+    segments: [
+      [0, 1],
+      [1, 2],
+      [2, 3],
+      [3, 4],
+      [3, 5],
+    ],
+  },
+  // Andromeda pt. 2
+  {
+    stars: [
+      { elevation: 17.7, azimuth: 50.1 },
+      { elevation: 14.3, azimuth: 47.3 },
+      { elevation: 10.8, azimuth: 41.7 },
+    ],
+    segments: [
+      [0, 1],
+      [1, 2],
+    ],
   },
   {
-    start: { elevation: 61, azimuth: 28 },
-    end: { elevation: 36, azimuth: 74 },
-    duration: 5.4,
-    delay: 3.2,
-    offset: 3.6,
+    stars: [
+      { elevation: 24.5, azimuth: 62.5 },
+      { elevation: 24.4, azimuth: 64.3 },
+      { elevation: 22.9, azimuth: 63.5 },
+      { elevation: 19.7, azimuth: 59.8 },
+      { elevation: 23.7, azimuth: 60.6 },
+      { elevation: 22.9, azimuth: 63.5 },
+      { elevation: 23.4, azimuth: 56.9 },
+    ],
+    segments: [
+      [0, 1],
+      [1, 2],
+      [2, 3],
+      [0, 4],
+      [4, 5],
+      [4, 6],
+    ],
   },
   {
-    start: { elevation: 48, azimuth: 334 },
-    end: { elevation: 27, azimuth: 18 },
-    duration: 4.8,
-    delay: 3.8,
-    offset: 6.2,
+    stars: [
+      { elevation: 18, azimuth: 111.3 },
+      { elevation: 16.2, azimuth: 116 },
+      { elevation: 14.8, azimuth: 117.2 },
+      { elevation: 13.3, azimuth: 117.7 },
+      { elevation: 11.3, azimuth: 116.4 },
+      { elevation: 10.4, azimuth: 118.4 },
+      { elevation: 5.6, azimuth: 116.5 },
+    ],
+    segments: [
+      [0, 1],
+      [1, 2],
+      [2, 3],
+      [3, 4],
+      [4, 5],
+      [5, 6],
+    ],
   },
   {
-    start: { elevation: 44, azimuth: 84 },
-    end: { elevation: 21, azimuth: 128 },
-    duration: 5.6,
-    delay: 4.2,
-    offset: 8.4,
+    stars: [
+      { elevation: 16.4, azimuth: 204.2 },
+      { elevation: 17.8, azimuth: 210.2 },
+      { elevation: 15.6, azimuth: 199.8 },
+      { elevation: 15.7, azimuth: 196.2 },
+      { elevation: 13.1, azimuth: 207.5 },
+    ],
+    segments: [
+      [0, 1],
+      [0, 2],
+      [2, 3],
+      [0, 4],
+    ],
   },
-] as const
+  {
+    stars: [
+      { elevation: 16.4, azimuth: 204.2 },
+      { elevation: 17.8, azimuth: 210.2 },
+      { elevation: 15.6, azimuth: 199.8 },
+      { elevation: 15.7, azimuth: 196.2 },
+      { elevation: 13.1, azimuth: 207.5 },
+    ],
+    segments: [
+      [0, 1],
+      [0, 2],
+      [2, 3],
+      [0, 4],
+    ],
+  },
+  {
+    stars: [
+      { elevation: 12.7, azimuth: 269.3 },
+      { elevation: 14.4, azimuth: 262.8 },
+      { elevation: 10.3, azimuth: 266 },
+      { elevation: 16.7, azimuth: 259.5 },
+      { elevation: 21.5, azimuth: 265.5 },
+      { elevation: 21.5, azimuth: 255.8 },
+      { elevation: 22.7, azimuth: 253.8 },
+      { elevation: 25.3, azimuth: 257.1 },
+      { elevation: 19.1, azimuth: 252 },
+      { elevation: 25.8, azimuth: 253 },
+    ],
+    segments: [
+      [0, 1],
+      [1, 2],
+      [1, 3],
+      [3, 4],
+      [3, 5],
+      [5, 6],
+      [6, 7],
+      [6, 8],
+      [6, 9],
+    ],
+  },
+  {
+    stars: [
+      { elevation: 5.7, azimuth: 297.4 },
+      { elevation: 9.2, azimuth: 298.4 },
+      { elevation: 5.7, azimuth: 298.3 },
+      { elevation: 12.5, azimuth: 301 },
+      { elevation: 14.2, azimuth: 299.7 },
+      { elevation: 14.5, azimuth: 299.7 },
+      { elevation: 16.2, azimuth: 294.4 },
+      { elevation: 16.4, azimuth: 300.2 },
+      { elevation: 17.4, azimuth: 304.1 },
+      { elevation: 17.8, azimuth: 308.5 },
+      { elevation: 16.4, azimuth: 309.7 },
+      { elevation: 15, azimuth: 306.8 },
+      { elevation: 17.4, azimuth: 304.1 },
+      { elevation: 12.5, azimuth: 301.1 },
+      { elevation: 12.5, azimuth: 301.2 },
+      { elevation: 19.6, azimuth: 307 },
+      { elevation: 23.9, azimuth: 307.5 },
+      { elevation: 25.2, azimuth: 311 },
+      { elevation: 12.6, azimuth: 308.5 },
+      { elevation: 8, azimuth: 308.2 },
+      { elevation: 8, azimuth: 307.2 },
+    ],
+    segments: [
+      [0, 1],
+      [1, 2],
+      [1, 3],
+      [3, 4],
+      [4, 5],
+      [5, 6],
+      [6, 7],
+      [7, 8],
+      [8, 9],
+      [9, 10],
+      [10, 11],
+      [11, 12],
+      [11, 13],
+      [13, 14],
+      [9, 15],
+      [15, 16],
+      [16, 17],
+      [10, 18],
+      [18, 19],
+      [18, 20],
+    ],
+  },
+] as const;
 
-function createStarPositions(count: number, seedBase: number, phiMax = 0.46) {
-  const arr = new Float32Array(count * 3)
-  let seed = seedBase
+function wrapAzimuth(value: number) {
+  return ((value % 360) + 360) % 360;
+}
+
+function createCometPaths(count: number) {
+  const paths: Array<{
+    start: SphericalPoint;
+    end: SphericalPoint;
+    duration: number;
+    delay: number;
+    offset: number;
+  }> = [];
+
+  let seed = Math.floor(Math.random() * 4_294_967_295) >>> 0;
 
   const random = () => {
-    seed = (seed * 1_664_525 + 1_013_904_223) >>> 0
-    return seed / 4_294_967_296
+    seed = (seed * 1_664_525 + 1_013_904_223) >>> 0;
+    return seed / 4_294_967_296;
+  };
+
+  for (let index = 0; index < count; index += 1) {
+    const startAzimuth = random() * 360;
+    const sweep = (26 + random() * 32) * (random() > 0.5 ? 1 : -1);
+    const startElevation = 14 + random() * 24;
+    const endElevation = Math.max(8, startElevation - (14 + random() * 16));
+    const duration = 2.4 + random() * 1.3;
+    const delay = 10 + random() * 0.8;
+    const offset = index * 0.72 + random() * 1.2;
+
+    paths.push({
+      start: { elevation: startElevation, azimuth: startAzimuth },
+      end: {
+        elevation: endElevation,
+        azimuth: wrapAzimuth(startAzimuth + sweep),
+      },
+      duration,
+      delay,
+      offset,
+    });
   }
+
+  return paths;
+}
+
+function createStarPositions(count: number, seedBase: number, phiMax = 0.46) {
+  const arr = new Float32Array(count * 3);
+  let seed = seedBase;
+
+  const random = () => {
+    seed = (seed * 1_664_525 + 1_013_904_223) >>> 0;
+    return seed / 4_294_967_296;
+  };
 
   for (let i = 0; i < count; i++) {
-    const theta = random() * Math.PI * 2
-    const phi = random() * Math.PI * phiMax
-    const r = 7_500 + random() * 1_200
-    arr[i * 3] = r * Math.sin(phi) * Math.cos(theta)
-    arr[i * 3 + 1] = r * Math.cos(phi)
-    arr[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta)
+    const theta = random() * Math.PI * 2;
+    const phi = random() * Math.PI * phiMax;
+    const r = 7_500 + random() * 1_200;
+    arr[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+    arr[i * 3 + 1] = r * Math.cos(phi);
+    arr[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta);
   }
 
-  return arr
+  return arr;
 }
 
 function createConstellationData(radius = 7_420) {
-  const lineCoords: number[] = []
-  const pointCoords: number[] = []
-  const tempA = new THREE.Vector3()
-  const tempB = new THREE.Vector3()
-  const centroid = new THREE.Vector3()
+  const lineCoords: number[] = [];
+  const pointCoords: number[] = [];
+  const tempA = new THREE.Vector3();
+  const tempB = new THREE.Vector3();
+  const centroid = new THREE.Vector3();
 
   for (const constellation of CONSTELLATION_SETS) {
     const points = constellation.stars.map((star) => {
       return vecFromSpherical(star.elevation, star.azimuth, new THREE.Vector3())
         .multiplyScalar(radius)
-        .clone()
-    })
+        .clone();
+    });
 
-    centroid.set(0, 0, 0)
+    centroid.set(0, 0, 0);
     for (const point of points) {
-      centroid.add(point)
+      centroid.add(point);
     }
-    centroid.multiplyScalar(1 / points.length)
+    centroid.multiplyScalar(1 / points.length);
 
     for (const point of points) {
-      point.lerp(centroid, 0.22)
+      point.lerp(centroid, 0.22);
     }
 
     for (const point of points) {
-      pointCoords.push(point.x, point.y, point.z)
+      pointCoords.push(point.x, point.y, point.z);
     }
 
     for (const [from, to] of constellation.segments) {
-      tempA.copy(points[from])
-      tempB.copy(points[to])
-      lineCoords.push(tempA.x, tempA.y, tempA.z, tempB.x, tempB.y, tempB.z)
+      tempA.copy(points[from]);
+      tempB.copy(points[to]);
+      lineCoords.push(tempA.x, tempA.y, tempA.z, tempB.x, tempB.y, tempB.z);
     }
   }
 
   return {
     lines: new Float32Array(lineCoords),
     stars: new Float32Array(pointCoords),
-  }
+  };
 }
 
 function applySkyUniforms(
   material: THREE.ShaderMaterial,
   scene: SceneSnapshot,
   sunPosition: THREE.Vector3,
-  elapsedTime: number,
+  elapsedTime: number
 ) {
-  const uniforms = material.uniforms
+  const uniforms = material.uniforms;
 
-  uniforms['time'].value = elapsedTime
-  uniforms['sunPosition'].value.copy(sunPosition)
-  uniforms['rayleigh'].value = scene.rayleigh
-  uniforms['turbidity'].value = scene.turbidity
-  uniforms['mieCoefficient'].value = scene.mieCoefficient
-  uniforms['mieDirectionalG'].value = scene.mieG
+  uniforms["time"].value = elapsedTime;
+  uniforms["sunPosition"].value.copy(sunPosition);
+  uniforms["rayleigh"].value = scene.rayleigh;
+  uniforms["turbidity"].value = scene.turbidity;
+  uniforms["mieCoefficient"].value = scene.mieCoefficient;
+  uniforms["mieDirectionalG"].value = scene.mieG;
 
-  if (uniforms['cloudCoverage'] !== undefined) {
-    uniforms['cloudScale'].value = scene.cloudScale
-    uniforms['cloudSpeed'].value = scene.cloudSpeed
-    uniforms['cloudCoverage'].value = scene.cloudCoverage
-    uniforms['cloudDensity'].value = scene.cloudDensity
-    uniforms['cloudElevation'].value = scene.cloudElevation
+  if (uniforms["cloudCoverage"] !== undefined) {
+    uniforms["cloudScale"].value = scene.cloudScale;
+    uniforms["cloudSpeed"].value = scene.cloudSpeed;
+    uniforms["cloudCoverage"].value = scene.cloudCoverage;
+    uniforms["cloudDensity"].value = scene.cloudDensity;
+    uniforms["cloudElevation"].value = scene.cloudElevation;
   }
 }
 
 function roundToStep(value: number, step: number) {
-  return Math.round(value / step) * step
+  return Math.round(value / step) * step;
 }
 
 function buildEnvironmentKey(scene: SceneSnapshot) {
@@ -260,22 +529,22 @@ function buildEnvironmentKey(scene: SceneSnapshot) {
     roundToStep(scene.mieG, 0.01).toFixed(2),
     roundToStep(scene.cloudCoverage, 0.01).toFixed(2),
     roundToStep(scene.cloudDensity, 0.01).toFixed(2),
-  ].join('|')
+  ].join("|");
 }
 
 function setSceneEnvironment(scene: THREE.Scene, texture: THREE.Texture | null) {
-  scene.environment = texture
+  scene.environment = texture;
 }
 
 function createGlowTexture() {
-  const size = 256
-  const canvas = document.createElement('canvas')
-  canvas.width = size
-  canvas.height = size
+  const size = 256;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
 
-  const context = canvas.getContext('2d')
+  const context = canvas.getContext("2d");
   if (!context) {
-    return new THREE.Texture()
+    return new THREE.Texture();
   }
 
   const gradient = context.createRadialGradient(
@@ -284,32 +553,32 @@ function createGlowTexture() {
     0,
     size / 2,
     size / 2,
-    size / 2,
-  )
+    size / 2
+  );
 
-  gradient.addColorStop(0, 'rgba(255, 255, 255, 1)')
-  gradient.addColorStop(0.12, 'rgba(255, 245, 220, 0.98)')
-  gradient.addColorStop(0.35, 'rgba(255, 215, 150, 0.46)')
-  gradient.addColorStop(0.7, 'rgba(255, 180, 110, 0.08)')
-  gradient.addColorStop(1, 'rgba(255, 180, 110, 0)')
+  gradient.addColorStop(0, "rgba(255, 255, 255, 1)");
+  gradient.addColorStop(0.12, "rgba(255, 245, 220, 0.98)");
+  gradient.addColorStop(0.35, "rgba(255, 215, 150, 0.46)");
+  gradient.addColorStop(0.7, "rgba(255, 180, 110, 0.08)");
+  gradient.addColorStop(1, "rgba(255, 180, 110, 0)");
 
-  context.fillStyle = gradient
-  context.fillRect(0, 0, size, size)
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, size, size);
 
-  const texture = new THREE.CanvasTexture(canvas)
-  texture.needsUpdate = true
-  return texture
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.needsUpdate = true;
+  return texture;
 }
 
 function createStarGlowTexture() {
-  const size = 192
-  const canvas = document.createElement('canvas')
-  canvas.width = size
-  canvas.height = size
-  const context = canvas.getContext('2d')
+  const size = 192;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const context = canvas.getContext("2d");
 
   if (!context) {
-    return new THREE.Texture()
+    return new THREE.Texture();
   }
 
   const gradient = context.createRadialGradient(
@@ -318,59 +587,59 @@ function createStarGlowTexture() {
     0,
     size / 2,
     size / 2,
-    size / 2,
-  )
+    size / 2
+  );
 
-  gradient.addColorStop(0, 'rgba(255, 255, 255, 1)')
-  gradient.addColorStop(0.22, 'rgba(225, 236, 255, 0.95)')
-  gradient.addColorStop(0.58, 'rgba(175, 205, 255, 0.28)')
-  gradient.addColorStop(1, 'rgba(175, 205, 255, 0)')
+  gradient.addColorStop(0, "rgba(255, 255, 255, 1)");
+  gradient.addColorStop(0.22, "rgba(225, 236, 255, 0.95)");
+  gradient.addColorStop(0.58, "rgba(175, 205, 255, 0.28)");
+  gradient.addColorStop(1, "rgba(175, 205, 255, 0)");
 
-  context.fillStyle = gradient
-  context.fillRect(0, 0, size, size)
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, size, size);
 
-  const texture = new THREE.CanvasTexture(canvas)
-  texture.needsUpdate = true
-  return texture
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.needsUpdate = true;
+  return texture;
 }
 
 function createMoonCrescentTexture() {
-  const size = 256
-  const canvas = document.createElement('canvas')
-  canvas.width = size
-  canvas.height = size
-  const context = canvas.getContext('2d')
+  const size = 256;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const context = canvas.getContext("2d");
 
   if (!context) {
-    return new THREE.Texture()
+    return new THREE.Texture();
   }
 
-  context.clearRect(0, 0, size, size)
-  context.fillStyle = 'rgba(238, 236, 221, 0.98)'
-  context.beginPath()
-  context.arc(size * 0.48, size * 0.5, size * 0.23, 0, Math.PI * 2)
-  context.fill()
+  context.clearRect(0, 0, size, size);
+  context.fillStyle = "rgba(238, 236, 221, 0.98)";
+  context.beginPath();
+  context.arc(size * 0.48, size * 0.5, size * 0.23, 0, Math.PI * 2);
+  context.fill();
 
-  context.globalCompositeOperation = 'destination-out'
-  context.beginPath()
-  context.arc(size * 0.58, size * 0.46, size * 0.23, 0, Math.PI * 2)
-  context.fill()
-  context.globalCompositeOperation = 'source-over'
+  context.globalCompositeOperation = "destination-out";
+  context.beginPath();
+  context.arc(size * 0.58, size * 0.46, size * 0.23, 0, Math.PI * 2);
+  context.fill();
+  context.globalCompositeOperation = "source-over";
 
-  const texture = new THREE.CanvasTexture(canvas)
-  texture.needsUpdate = true
-  return texture
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.needsUpdate = true;
+  return texture;
 }
 
 function createMoonGlowTexture() {
-  const size = 224
-  const canvas = document.createElement('canvas')
-  canvas.width = size
-  canvas.height = size
-  const context = canvas.getContext('2d')
+  const size = 224;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const context = canvas.getContext("2d");
 
   if (!context) {
-    return new THREE.Texture()
+    return new THREE.Texture();
   }
 
   const gradient = context.createRadialGradient(
@@ -379,57 +648,73 @@ function createMoonGlowTexture() {
     0,
     size / 2,
     size / 2,
-    size / 2,
-  )
+    size / 2
+  );
 
-  gradient.addColorStop(0, 'rgba(222, 235, 255, 0.88)')
-  gradient.addColorStop(0.28, 'rgba(180, 212, 255, 0.34)')
-  gradient.addColorStop(1, 'rgba(180, 212, 255, 0)')
+  gradient.addColorStop(0, "rgba(222, 235, 255, 0.88)");
+  gradient.addColorStop(0.28, "rgba(180, 212, 255, 0.34)");
+  gradient.addColorStop(1, "rgba(180, 212, 255, 0)");
 
-  context.fillStyle = gradient
-  context.fillRect(0, 0, size, size)
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, size, size);
 
-  const texture = new THREE.CanvasTexture(canvas)
-  texture.needsUpdate = true
-  return texture
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.needsUpdate = true;
+  return texture;
+}
+
+function CelestialLayer({ children }: { children: ReactNode }) {
+  const groupRef = useRef<THREE.Group>(null);
+
+  useEffect(() => {
+    if (!groupRef.current) {
+      return;
+    }
+
+    groupRef.current.traverse((object) => {
+      object.layers.set(SKY_OBJECT_LAYER);
+    });
+  }, []);
+
+  return <group ref={groupRef}>{children}</group>;
 }
 
 function Starfield() {
-  const baseMatRef = useRef<THREE.PointsMaterial>(null)
-  const brightMatRef = useRef<THREE.PointsMaterial>(null)
-  const basePositions = useMemo(() => createStarPositions(3_500, 1_337), [])
-  const brightPositions = useMemo(() => createStarPositions(240, 3_211, 0.42), [])
+  const baseMatRef = useRef<THREE.PointsMaterial>(null);
+  const brightMatRef = useRef<THREE.PointsMaterial>(null);
+  const basePositions = useMemo(() => createStarPositions(3_500, 1_337), []);
+  const brightPositions = useMemo(() => createStarPositions(240, 3_211, 0.42), []);
 
   useFrame((state, delta) => {
-    if (!baseMatRef.current || !brightMatRef.current) return
-    const safeDelta = Math.min(delta, 1 / 30)
-    const scene = getSceneSnapshot(getSceneDate(), sceneParams.location)
-    const glowFactor = THREE.MathUtils.clamp(scene.starsOpacity * 1.2, 0, 1)
-    const shimmer = 0.94 + Math.sin(state.clock.elapsedTime * 0.9) * 0.11
-    const brightPulse = 0.9 + Math.sin(state.clock.elapsedTime * 2.8) * 0.24
+    if (!baseMatRef.current || !brightMatRef.current) return;
+    const safeDelta = Math.min(delta, 1 / 30);
+    const scene = getSceneSnapshot(getSceneDate(), sceneParams.location);
+    const glowFactor = THREE.MathUtils.clamp(scene.starsOpacity * 1.2, 0, 1);
+    const shimmer = 0.94 + Math.sin(state.clock.elapsedTime * 0.9) * 0.11;
+    const brightPulse = 0.9 + Math.sin(state.clock.elapsedTime * 2.8) * 0.24;
 
     baseMatRef.current.opacity = THREE.MathUtils.lerp(
       baseMatRef.current.opacity,
       Math.min(1, glowFactor * 1.28 * shimmer),
-      safeDelta * 1.7,
-    )
+      safeDelta * 1.7
+    );
     baseMatRef.current.size = THREE.MathUtils.lerp(
       baseMatRef.current.size,
       2.3 + glowFactor * 1.15,
-      safeDelta * 1.5,
-    )
+      safeDelta * 1.5
+    );
 
     brightMatRef.current.opacity = THREE.MathUtils.lerp(
       brightMatRef.current.opacity,
       Math.min(1, glowFactor * 1.32 * brightPulse),
-      safeDelta * 2.4,
-    )
+      safeDelta * 2.4
+    );
     brightMatRef.current.size = THREE.MathUtils.lerp(
       brightMatRef.current.size,
       4 + glowFactor * 2.4,
-      safeDelta * 2,
-    )
-  })
+      safeDelta * 2
+    );
+  });
 
   return (
     <>
@@ -462,40 +747,40 @@ function Starfield() {
         />
       </points>
     </>
-  )
+  );
 }
 
 function Constellations() {
-  const lineMatRef = useRef<THREE.LineBasicMaterial>(null)
-  const pointMatRef = useRef<THREE.PointsMaterial>(null)
-  const constellationData = useMemo(() => createConstellationData(), [])
+  const lineMatRef = useRef<THREE.LineBasicMaterial>(null);
+  const pointMatRef = useRef<THREE.PointsMaterial>(null);
+  const constellationData = useMemo(() => createConstellationData(), []);
 
   useFrame((state, delta) => {
     if (!lineMatRef.current || !pointMatRef.current) {
-      return
+      return;
     }
 
-    const safeDelta = Math.min(delta, 1 / 30)
-    const scene = getSceneSnapshot(getSceneDate(), sceneParams.location)
-    const starVisibility = THREE.MathUtils.clamp(scene.starsOpacity * 0.7, 0, 1)
-    const pulse = 0.94 + Math.sin(state.clock.elapsedTime * 1.9) * 0.08
-    const constellationVisibility = THREE.MathUtils.clamp(scene.starsOpacity * 0.62, 0, 1)
+    const safeDelta = Math.min(delta, 1 / 30);
+    const scene = getSceneSnapshot(getSceneDate(), sceneParams.location);
+    const starVisibility = THREE.MathUtils.clamp(scene.starsOpacity * 0.7, 0, 1);
+    const pulse = 0.95 + Math.sin(state.clock.elapsedTime * 1.9) * 0.1;
+    const constellationVisibility = THREE.MathUtils.clamp(scene.starsOpacity * 0.72, 0, 1);
     lineMatRef.current.opacity = THREE.MathUtils.lerp(
       lineMatRef.current.opacity,
-      constellationVisibility * 0.12,
-      safeDelta * 2,
-    )
+      constellationVisibility * 0.22,
+      safeDelta * 2
+    );
     pointMatRef.current.opacity = THREE.MathUtils.lerp(
       pointMatRef.current.opacity,
-      Math.min(0.42, starVisibility * 0.42 * pulse),
-      safeDelta * 2.1,
-    )
+      Math.min(0.62, starVisibility * 0.62 * pulse),
+      safeDelta * 2.1
+    );
     pointMatRef.current.size = THREE.MathUtils.lerp(
       pointMatRef.current.size,
       0.92 + constellationVisibility * 0.16,
-      safeDelta * 2.1,
-    )
-  })
+      safeDelta * 2.1
+    );
+  });
 
   return (
     <>
@@ -505,10 +790,11 @@ function Constellations() {
         </bufferGeometry>
         <lineBasicMaterial
           ref={lineMatRef}
-          color="#8eb7ff"
+          color="#7fe6ff"
           transparent
           opacity={0}
           depthWrite={false}
+          blending={THREE.AdditiveBlending}
         />
       </lineSegments>
       <points>
@@ -517,16 +803,17 @@ function Constellations() {
         </bufferGeometry>
         <pointsMaterial
           ref={pointMatRef}
-          color="#eef6ff"
+          color="#dfffff"
           size={0.95}
           transparent
           opacity={0}
           sizeAttenuation={false}
           depthWrite={false}
+          blending={THREE.AdditiveBlending}
         />
       </points>
     </>
-  )
+  );
 }
 
 function Comet({
@@ -536,71 +823,79 @@ function Comet({
   delay,
   offset,
 }: {
-  start: SphericalPoint
-  end: SphericalPoint
-  duration: number
-  delay: number
-  offset: number
+  start: SphericalPoint;
+  end: SphericalPoint;
+  duration: number;
+  delay: number;
+  offset: number;
 }) {
-  const groupRef = useRef<THREE.Group>(null)
-  const headRef = useRef<THREE.Sprite>(null)
-  const headMatRef = useRef<THREE.SpriteMaterial>(null)
-  const trailMatRef = useRef<THREE.LineBasicMaterial>(null)
-  const trailAttrRef = useRef<THREE.BufferAttribute>(null)
-  const glowTexture = useMemo(() => createStarGlowTexture(), [])
-  const trailPositions = useMemo(() => new Float32Array(6), [])
+  const groupRef = useRef<THREE.Group>(null);
+  const headRef = useRef<THREE.Sprite>(null);
+  const headMatRef = useRef<THREE.SpriteMaterial>(null);
+  const trailMatRef = useRef<THREE.LineBasicMaterial>(null);
+  const trailAttrRef = useRef<THREE.BufferAttribute>(null);
+  const glowTexture = useMemo(() => createStarGlowTexture(), []);
+  const trailPositions = useMemo(() => new Float32Array(6), []);
   const path = useMemo(() => {
     return {
-      start: vecFromSpherical(start.elevation, start.azimuth, new THREE.Vector3()).multiplyScalar(7_080),
+      start: vecFromSpherical(start.elevation, start.azimuth, new THREE.Vector3()).multiplyScalar(
+        7_080
+      ),
       end: vecFromSpherical(end.elevation, end.azimuth, new THREE.Vector3()).multiplyScalar(7_080),
-    }
-  }, [end.azimuth, end.elevation, start.azimuth, start.elevation])
-  const _headPos = useRef(new THREE.Vector3())
-  const _tailPos = useRef(new THREE.Vector3())
+    };
+  }, [end.azimuth, end.elevation, start.azimuth, start.elevation]);
+  const _headPos = useRef(new THREE.Vector3());
+  const _tailPos = useRef(new THREE.Vector3());
 
   useEffect(() => {
     return () => {
-      glowTexture.dispose()
-    }
-  }, [glowTexture])
+      glowTexture.dispose();
+    };
+  }, [glowTexture]);
 
   useFrame((state) => {
-    if (!groupRef.current || !headRef.current || !headMatRef.current || !trailMatRef.current || !trailAttrRef.current) {
-      return
+    if (
+      !groupRef.current ||
+      !headRef.current ||
+      !headMatRef.current ||
+      !trailMatRef.current ||
+      !trailAttrRef.current
+    ) {
+      return;
     }
 
-    const scene = getSceneSnapshot(getSceneDate(), sceneParams.location)
-    const nightVisibility = THREE.MathUtils.clamp(scene.starsOpacity * 1.2, 0, 1)
-    const cycle = duration + delay
-    const localTime = (state.clock.elapsedTime + offset) % cycle
+    const scene = getSceneSnapshot(getSceneDate(), sceneParams.location);
+    const nightVisibility = THREE.MathUtils.clamp(scene.starsOpacity * 1.5, 0, 1);
+    const cycle = duration + delay;
+    const localTime = (state.clock.elapsedTime + offset) % cycle;
 
     if (nightVisibility <= 0.05 || localTime > duration) {
-      groupRef.current.visible = false
-      return
+      groupRef.current.visible = false;
+      return;
     }
 
-    const progress = localTime / duration
-    const easedProgress = THREE.MathUtils.smootherstep(progress, 0, 1)
-    const tailProgress = Math.max(0, easedProgress - 0.032)
-    const fade = 0.72 + Math.sin(progress * Math.PI) * 0.28
+    const progress = localTime / duration;
+    const easedProgress = THREE.MathUtils.smootherstep(progress, 0, 1);
+    const tailProgress = Math.max(0, easedProgress - 0.032);
+    const fade = 0.8 + Math.sin(progress * Math.PI) * 0.2;
 
-    _headPos.current.copy(path.start).lerp(path.end, easedProgress)
-    _tailPos.current.copy(path.start).lerp(path.end, tailProgress)
-    headRef.current.position.copy(_headPos.current)
-    headRef.current.scale.setScalar(14 + fade * 7)
+    _headPos.current.copy(path.start).lerp(path.end, easedProgress);
+    _tailPos.current.copy(path.start).lerp(path.end, tailProgress);
+    headRef.current.position.copy(_headPos.current);
+    headRef.current.scale.setScalar(18 + fade * 8);
 
-    trailPositions[0] = _tailPos.current.x
-    trailPositions[1] = _tailPos.current.y
-    trailPositions[2] = _tailPos.current.z
-    trailPositions[3] = _headPos.current.x
-    trailPositions[4] = _headPos.current.y
-    trailPositions[5] = _headPos.current.z
-    trailAttrRef.current.needsUpdate = true
+    trailPositions[0] = _tailPos.current.x;
+    trailPositions[1] = _tailPos.current.y;
+    trailPositions[2] = _tailPos.current.z;
+    trailPositions[3] = _headPos.current.x;
+    trailPositions[4] = _headPos.current.y;
+    trailPositions[5] = _headPos.current.z;
+    trailAttrRef.current.needsUpdate = true;
 
-    headMatRef.current.opacity = Math.min(1, fade * 1.15 * nightVisibility)
-    trailMatRef.current.opacity = fade * 0.78 * nightVisibility
-    groupRef.current.visible = true
-  })
+    headMatRef.current.opacity = Math.min(1, fade * 1.35 * nightVisibility);
+    trailMatRef.current.opacity = fade * 0.96 * nightVisibility;
+    groupRef.current.visible = true;
+  });
 
   return (
     <group ref={groupRef} visible={false} renderOrder={9}>
@@ -633,13 +928,15 @@ function Comet({
         />
       </sprite>
     </group>
-  )
+  );
 }
 
 function CometField() {
+  const cometPaths = useMemo(() => createCometPaths(8), []);
+
   return (
     <>
-      {COMET_PATHS.map((comet) => (
+      {cometPaths.map((comet) => (
         <Comet
           key={`${comet.start.azimuth}-${comet.end.azimuth}`}
           start={comet.start}
@@ -650,50 +947,55 @@ function CometField() {
         />
       ))}
     </>
-  )
+  );
 }
 
 function Moon() {
-  const groupRef = useRef<THREE.Group>(null)
-  const crescentRef = useRef<THREE.Sprite>(null)
-  const crescentMatRef  = useRef<THREE.SpriteMaterial>(null)
-  const glowMatRef = useRef<THREE.SpriteMaterial>(null)
-  const crescentTexture = useMemo(() => createMoonCrescentTexture(), [])
-  const glowTexture = useMemo(() => createMoonGlowTexture(), [])
-  const _pos = useRef(new THREE.Vector3())
+  const groupRef = useRef<THREE.Group>(null);
+  const crescentRef = useRef<THREE.Sprite>(null);
+  const crescentMatRef = useRef<THREE.SpriteMaterial>(null);
+  const glowMatRef = useRef<THREE.SpriteMaterial>(null);
+  const crescentTexture = useMemo(() => createMoonCrescentTexture(), []);
+  const glowTexture = useMemo(() => createMoonGlowTexture(), []);
+  const _pos = useRef(new THREE.Vector3());
 
   useEffect(() => {
     return () => {
-      crescentTexture.dispose()
-      glowTexture.dispose()
-    }
-  }, [crescentTexture, glowTexture])
+      crescentTexture.dispose();
+      glowTexture.dispose();
+    };
+  }, [crescentTexture, glowTexture]);
 
   useFrame((_, delta) => {
-    if (!groupRef.current || !crescentRef.current || !crescentMatRef.current || !glowMatRef.current) return
-    const safeDelta = Math.min(delta, 1 / 30)
-    const scene = getSceneSnapshot(getSceneDate(), sceneParams.location)
-    vecFromSpherical(scene.moonElev, scene.moonAz, _pos.current)
-    groupRef.current.position.copy(_pos.current).multiplyScalar(4_200)
+    if (!groupRef.current || !crescentRef.current || !crescentMatRef.current || !glowMatRef.current)
+      return;
+    const safeDelta = Math.min(delta, 1 / 30);
+    const scene = getSceneSnapshot(getSceneDate(), sceneParams.location);
+    vecFromSpherical(scene.moonElev, scene.moonAz, _pos.current);
+    groupRef.current.position.copy(_pos.current).multiplyScalar(4_200);
 
-    const moonVisibility = THREE.MathUtils.clamp(scene.moonOpacity * 1.05, 0, 1)
-    const glowVisibility = THREE.MathUtils.clamp(scene.nightFactor * 0.75 + scene.twilightFactor * 0.35, 0, 1)
-    const orientation = THREE.MathUtils.degToRad(scene.sunAz - scene.moonAz + 90)
+    const moonVisibility = THREE.MathUtils.clamp(scene.moonOpacity * 1.05, 0.8, 1);
+    const glowVisibility = THREE.MathUtils.clamp(
+      scene.nightFactor * 0.75 + scene.twilightFactor * 0.08,
+      0,
+      1
+    );
+    const orientation = THREE.MathUtils.degToRad(scene.sunAz - scene.moonAz + 90);
 
-    crescentRef.current.scale.setScalar(132 + glowVisibility * 28)
-    crescentMatRef.current.rotation = orientation
+    crescentRef.current.scale.setScalar(150 + glowVisibility * 50);
+    crescentMatRef.current.rotation = orientation;
     crescentMatRef.current.opacity = THREE.MathUtils.lerp(
       crescentMatRef.current.opacity,
       moonVisibility,
-      safeDelta * 2,
-    )
+      safeDelta * 2
+    );
     glowMatRef.current.opacity = THREE.MathUtils.lerp(
       glowMatRef.current.opacity,
-      glowVisibility * 0.34,
-      safeDelta * 2,
-    )
-    groupRef.current.visible = glowVisibility > 0.02
-  })
+      glowVisibility * 40,
+      safeDelta * 1
+    );
+    groupRef.current.visible = glowVisibility > 0.02;
+  });
 
   return (
     <group ref={groupRef} visible={false} renderOrder={8}>
@@ -701,7 +1003,7 @@ function Moon() {
         <spriteMaterial
           ref={glowMatRef}
           map={glowTexture}
-          color="#c4d9ff"
+          color="#cdc398"
           transparent
           opacity={0}
           depthWrite={false}
@@ -721,58 +1023,58 @@ function Moon() {
         />
       </sprite>
     </group>
-  )
+  );
 }
 
 function SunGlow() {
-  const groupRef = useRef<THREE.Group>(null)
-  const haloRef = useRef<THREE.Sprite>(null)
-  const coreRef = useRef<THREE.Sprite>(null)
-  const haloMatRef = useRef<THREE.SpriteMaterial>(null)
-  const coreMatRef = useRef<THREE.SpriteMaterial>(null)
-  const glowTexture = useMemo(() => createGlowTexture(), [])
-  const _pos = useRef(new THREE.Vector3())
+  const groupRef = useRef<THREE.Group>(null);
+  const haloRef = useRef<THREE.Sprite>(null);
+  const coreRef = useRef<THREE.Sprite>(null);
+  const haloMatRef = useRef<THREE.SpriteMaterial>(null);
+  const coreMatRef = useRef<THREE.SpriteMaterial>(null);
+  const glowTexture = useMemo(() => createGlowTexture(), []);
+  const _pos = useRef(new THREE.Vector3());
 
   useEffect(() => {
     return () => {
-      glowTexture.dispose()
-    }
-  }, [glowTexture])
+      glowTexture.dispose();
+    };
+  }, [glowTexture]);
 
   useFrame((_, delta) => {
-    if (!groupRef.current || !haloMatRef.current || !coreMatRef.current) return
-    const safeDelta = Math.min(delta, 1 / 30)
-    const scene = getSceneSnapshot(getSceneDate(), sceneParams.location)
-    vecFromSpherical(scene.sunElev, scene.sunAz, _pos.current)
-    groupRef.current.position.copy(_pos.current).multiplyScalar(4_350)
+    if (!groupRef.current || !haloMatRef.current || !coreMatRef.current) return;
+    const safeDelta = Math.min(delta, 1 / 30);
+    const scene = getSceneSnapshot(getSceneDate(), sceneParams.location);
+    vecFromSpherical(scene.sunElev, scene.sunAz, _pos.current);
+    groupRef.current.position.copy(_pos.current).multiplyScalar(4_350);
 
-    const visibleFactor = THREE.MathUtils.clamp((scene.sunElev + 3) / 10, 0, 1)
-    const haloOpacity = scene.sunHaloOpacity * visibleFactor
-    const coreOpacity = THREE.MathUtils.clamp(0.16 + visibleFactor * 0.34, 0, 0.5)
+    const visibleFactor = THREE.MathUtils.clamp((scene.sunElev + 3) / 10, 0, 1);
+    const haloOpacity = scene.sunHaloOpacity * visibleFactor;
+    const coreOpacity = THREE.MathUtils.clamp(0.16 + visibleFactor * 0.34, 0, 0.5);
 
     if (haloRef.current) {
-      haloRef.current.scale.setScalar(scene.sunHaloScale)
+      haloRef.current.scale.setScalar(scene.sunHaloScale);
     }
 
     if (coreRef.current) {
-      coreRef.current.scale.setScalar(scene.sunCoreScale)
+      coreRef.current.scale.setScalar(scene.sunCoreScale);
     }
 
-    haloMatRef.current.color.setHex(scene.sunGlowColorHex)
+    haloMatRef.current.color.setHex(scene.sunGlowColorHex);
     haloMatRef.current.opacity = THREE.MathUtils.lerp(
       haloMatRef.current.opacity,
       haloOpacity,
-      safeDelta * 3,
-    )
-    coreMatRef.current.color.setHex(scene.sunColorHex)
+      safeDelta * 3
+    );
+    coreMatRef.current.color.setHex(scene.sunColorHex);
     coreMatRef.current.opacity = THREE.MathUtils.lerp(
       coreMatRef.current.opacity,
       coreOpacity,
-      safeDelta * 3,
-    )
+      safeDelta * 3
+    );
 
-    groupRef.current.visible = visibleFactor > 0.001
-  })
+    groupRef.current.visible = visibleFactor > 0.001;
+  });
 
   return (
     <group ref={groupRef} renderOrder={10}>
@@ -801,95 +1103,99 @@ function SunGlow() {
         />
       </sprite>
     </group>
-  )
+  );
 }
 
 export default function OceanScene() {
-  const { gl, scene: threeScene } = useThree()
+  const { gl, scene: threeScene, camera } = useThree();
 
   const sky = useMemo(() => {
-    const s   = new SkyImpl()
-    s.scale.setScalar(10_000)
-    const u   = (s.material as THREE.ShaderMaterial).uniforms
-    const scene = getSceneSnapshot(getSceneDate(), sceneParams.location)
-    u['mieCoefficient'].value  = scene.mieCoefficient
-    u['turbidity'].value       = scene.turbidity
-    u['rayleigh'].value        = scene.rayleigh
-    u['mieDirectionalG'].value = scene.mieG
+    const s = new SkyImpl();
+    s.scale.setScalar(10_000);
+    const u = (s.material as THREE.ShaderMaterial).uniforms;
+    const scene = getSceneSnapshot(getSceneDate(), sceneParams.location);
+    u["mieCoefficient"].value = scene.mieCoefficient;
+    u["turbidity"].value = scene.turbidity;
+    u["rayleigh"].value = scene.rayleigh;
+    u["mieDirectionalG"].value = scene.mieG;
 
-    if (u['cloudScale'] !== undefined) {
-      u['cloudScale'].value = scene.cloudScale
-      u['cloudSpeed'].value = scene.cloudSpeed
-      u['cloudCoverage'].value = scene.cloudCoverage
-      u['cloudDensity'].value = scene.cloudDensity
-      u['cloudElevation'].value = scene.cloudElevation
+    if (u["cloudScale"] !== undefined) {
+      u["cloudScale"].value = scene.cloudScale;
+      u["cloudSpeed"].value = scene.cloudSpeed;
+      u["cloudCoverage"].value = scene.cloudCoverage;
+      u["cloudDensity"].value = scene.cloudDensity;
+      u["cloudElevation"].value = scene.cloudElevation;
     }
 
-    vecFromSpherical(scene.sunElev, scene.sunAz, u['sunPosition'].value)
-    return s
-  }, [])
+    vecFromSpherical(scene.sunElev, scene.sunAz, u["sunPosition"].value);
+    return s;
+  }, []);
 
   const envSky = useMemo(() => {
-    const s = new SkyImpl()
-    s.scale.setScalar(10_000)
-    return s
-  }, [])
-  const pmremGenerator = useMemo(() => new THREE.PMREMGenerator(gl), [gl])
+    const s = new SkyImpl();
+    s.scale.setScalar(10_000);
+    return s;
+  }, []);
+  const pmremGenerator = useMemo(() => new THREE.PMREMGenerator(gl), [gl]);
   const envScene = useMemo(() => {
-    const s = new THREE.Scene()
-    s.add(envSky)
-    return s
-  }, [envSky])
-  const envTargetRef = useRef<THREE.WebGLRenderTarget | null>(null)
-  const envKeyRef = useRef('')
-  const skyTimeRef = useRef(0)
-  const _sunPos   = useRef(new THREE.Vector3())
+    const s = new THREE.Scene();
+    s.add(envSky);
+    return s;
+  }, [envSky]);
+  const envTargetRef = useRef<THREE.WebGLRenderTarget | null>(null);
+  const envKeyRef = useRef("");
+  const skyTimeRef = useRef(0);
+  const _sunPos = useRef(new THREE.Vector3());
 
   useEffect(() => {
+    camera.layers.enable(SKY_OBJECT_LAYER);
+
     return () => {
-      envTargetRef.current?.dispose()
-      pmremGenerator.dispose()
-    }
-  }, [pmremGenerator])
+      envTargetRef.current?.dispose();
+      pmremGenerator.dispose();
+    };
+  }, [camera, pmremGenerator]);
 
   useFrame((state, delta) => {
-    const scene = getSceneSnapshot(getSceneDate(), sceneParams.location)
-    const safeDelta = Math.min(delta, 1 / 30)
-    const envKey = buildEnvironmentKey(scene)
+    const scene = getSceneSnapshot(getSceneDate(), sceneParams.location);
+    const safeDelta = Math.min(delta, 1 / 30);
+    const envKey = buildEnvironmentKey(scene);
 
-    skyTimeRef.current += safeDelta
+    skyTimeRef.current += safeDelta;
 
-    vecFromSpherical(scene.sunElev, scene.sunAz, _sunPos.current)
+    vecFromSpherical(scene.sunElev, scene.sunAz, _sunPos.current);
     applySkyUniforms(
       sky.material as THREE.ShaderMaterial,
       scene,
       _sunPos.current,
-      skyTimeRef.current,
-    )
+      skyTimeRef.current
+    );
     applySkyUniforms(
       envSky.material as THREE.ShaderMaterial,
       scene,
       _sunPos.current,
-      skyTimeRef.current,
-    )
+      skyTimeRef.current
+    );
 
     if (envKey !== envKeyRef.current || !envTargetRef.current) {
-      envKeyRef.current = envKey
-      envTargetRef.current?.dispose()
-      envTargetRef.current = pmremGenerator.fromScene(envScene)
-      setSceneEnvironment(threeScene, envTargetRef.current.texture)
+      envKeyRef.current = envKey;
+      envTargetRef.current?.dispose();
+      envTargetRef.current = pmremGenerator.fromScene(envScene);
+      setSceneEnvironment(threeScene, envTargetRef.current.texture);
     }
 
-    state.gl.toneMappingExposure = scene.exposure
-  })
+    state.gl.toneMappingExposure = scene.exposure;
+  });
 
   return (
     <>
       <primitive object={sky} />
       <SunGlow />
-      <Starfield />
-      <Constellations />
-      <CometField />
+      <CelestialLayer>
+        <Starfield />
+        <Constellations />
+        <CometField />
+      </CelestialLayer>
       <Moon />
       <Suspense fallback={null}>
         <Ocean />
@@ -906,5 +1212,5 @@ export default function OceanScene() {
         target={[0, 8, 0]}
       />
     </>
-  )
+  );
 }

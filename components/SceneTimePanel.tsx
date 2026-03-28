@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback, useId } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { createPortal } from "react-dom";
 
@@ -48,6 +48,8 @@ function PanelContent({
     setMinutesInput(p.minutes);
   }, [value]);
 
+  const idPrefix = useId();
+
   const handleManualChange = (h: number, m: number) => {
     const clH = clamp(h, 0, 23);
     const clM = clamp(m, 0, 59);
@@ -57,7 +59,7 @@ function PanelContent({
   };
 
   return (
-    <div className="w-full flex flex-col rounded-t-[2rem] sm:rounded-[1.5rem] bg-black/30 border border-white/10 p-6 pb-10 sm:pb-6 text-white min-w-[320px]">
+    <div className="w-full flex flex-col rounded-t-[2rem] sm:rounded-[1.5rem] bg-black/50 border border-white/10 p-6 pb-10 sm:pb-6 text-white min-w-[320px]">
       <div className="mb-6 flex items-center justify-between">
         <div className="space-y-1 gap-2">
           <h4 className="text-[0.65rem] font-bold uppercase tracking-[0.3em] text-[#0BC6B4]">
@@ -79,20 +81,34 @@ function PanelContent({
 
       <div className="mb-6 grid grid-cols-2 gap-4">
         <div className="rounded-2xl bg-white/5 border border-white/10 p-3 flex flex-col items-center focus-within:ring-3 focus-within:ring-[#0BC6B4] focus-within:border-[#0d8c6a] focus-within:outline-none">
-          <span className="text-[0.55rem] uppercase tracking-widest text-white/55 mb-1">Hours</span>
+          <label
+            htmlFor={`${idPrefix}-hours`}
+            className="text-[0.55rem] uppercase tracking-widest text-white/55 mb-1"
+          >
+            Hours
+          </label>
           <input
             type="number"
+            id={`${idPrefix}-hours`}
+            name="hours"
+            aria-label="hours"
             value={hoursInput}
             onChange={(e) => handleManualChange(parseInt(e.target.value || "0"), minutesInput)}
             className="bg-transparent text-2xl font-mono text-center w-full outline-none text-[#0BC6B4]"
           />
         </div>
         <div className="rounded-2xl bg-white/5 border border-white/10 p-3 flex flex-col items-center focus-within:ring-3 focus-within:ring-[#0BC6B4] focus-within:border-[#0d8c6a] focus-within:outline-none">
-          <span className="text-[0.55rem] uppercase tracking-widest text-white/55 mb-1">
+          <label
+            htmlFor={`${idPrefix}-minutes`}
+            className="text-[0.55rem] uppercase tracking-widest text-white/55 mb-1"
+          >
             Minutes
-          </span>
+          </label>
           <input
             type="number"
+            id={`${idPrefix}-minutes`}
+            name="minutes"
+            aria-label="minutes"
             value={minutesInput}
             onChange={(e) => handleManualChange(hoursInput, parseInt(e.target.value || "0"))}
             className="bg-transparent text-2xl font-mono text-center w-full outline-none text-[#0BC6B4]"
@@ -254,13 +270,12 @@ export default function SceneTimePanel({
                   className="absolute inset-0 bg-black/40 shadow-lg backdrop-blur-[2px] pointer-events-auto sm:hidden"
                 />
 
-                {/* ── Desktop dropdown ─────────────────────────────────────────
-                    FIX 1b: max-h + overflow-y-auto so it scrolls internally   */}
+                {/* Desktop dropdown */}
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 10 }}
-                  style={{ top: dropdownPos.top, left: dropdownPos.left }} // ← dynamic, replaces right-10 top-24
+                  style={{ top: dropdownPos.top, left: dropdownPos.left }}
                   className="hidden sm:block absolute w-[24rem] pointer-events-auto
              max-h-[80vh] overflow-y-auto rounded-[1.5rem]"
                 >

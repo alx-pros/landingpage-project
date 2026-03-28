@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
 import { useFrame } from "@react-three/fiber";
 import { useAnimations, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
@@ -12,7 +12,6 @@ interface EncounterSet {
   dolphinSeedA: number;
   dolphinSeedB: number;
   dolphinSeedC: number;
-  whaleSeed: number;
 }
 
 interface MaterialTuning {
@@ -28,46 +27,107 @@ interface ObstacleArea {
   radius: number;
 }
 
-interface MarineMotionConfig {
-  behavior: "dolphin" | "whale";
+interface DolphinMotionConfig {
   radiusRange: [number, number];
   angleRange: [number, number];
-  depthRange: [number, number];
   speedRange: [number, number];
   targetInterval: [number, number];
   avoidanceRadius: number;
   socialDistance: number;
   turnSpeed: number;
   bankFactor: number;
-  pitchFactor: number;
   swayAmount: number;
   swaySpeed: number;
   animationSpeedRange: [number, number];
   actionInterval: [number, number];
-  actionDuration: [number, number];
+  maxAcceleration: number;
+  headingDamping: number;
+  cruiseDepthRange: [number, number];
+  approachDepthRange: [number, number];
 }
 
-interface MarineMotionState {
+type DolphinPhase = "cruise" | "surface_approach" | "airborne" | "dive_recovery";
+
+interface DolphinMotionState {
   position: THREE.Vector3;
   velocity: THREE.Vector3;
   target: THREE.Vector3;
+  viaPoint: THREE.Vector3;
+  usingViaPoint: boolean;
   speed: number;
   retargetAt: number;
   actionAt: number;
-  actionDuration: number;
   actionStyle: number;
+  actionDuration: number;
+  heading: number;
+  headingOmega: number;
+  phase: DolphinPhase;
+  phaseEnteredAt: number;
+  launchAt: number;
+  jumpHeading: number;
+  jumpVelocity: THREE.Vector3;
+  renderDepth: number;
+  cruiseDepth: number;
+  approachDepth: number;
+  launchDepth: number;
+  diveMidDepth: number;
+  diveTargetDepth: number;
+  diveDuration: number;
+  exitPitch: number;
+  exitRoll: number;
+  sequenceRemaining: number;
+  podCooldownUntil: number;
+  isRacing: boolean; // NUOVO: Tiene traccia se il delfino sta gareggiando
 }
 
 interface SurfaceAction {
-  visible: boolean;
   lift: number;
   pitch: number;
   roll: number;
   yaw: number;
 }
 
+interface PodAnnouncement {
+  leaderId: string;
+  issuedAt: number;
+  expiresAt: number;
+  jumpCount: number;
+  participantGoal: number;
+  joinedIds: string[];
+  position: THREE.Vector3;
+  scheduledLaunchAt: number;
+  isRacing: boolean; // NUOVO: Dice agli altri membri che è in corso una gara
+}
+
+const DOLPHIN_ANIM = {
+  CLASSIC_LEAP: 0,
+  ARCING_LEAP: 1,
+  SIDE_FLIP: 2,
+  FRONT_FLIP: 3,
+  BACK_FLIP: 4,
+  TWIST_FLIP: 5,
+} as const;
+
+const DOLPHIN_ANIM_COUNT = 6;
+const DOLPHIN_ANIM_DURATION: readonly number[] = [1.72, 1.95, 1.5, 1.82, 1.9, 1.86];
+
+const WATER_SURFACE_Y = 0;
+// Probabilità alzate per favorire i raggruppamenti e le gare
+const POD_TRIGGER_CHANCE = 0.85; 
+const POD_JOIN_WINDOW = 4.5;
+const POD_JOIN_DISTANCE = 1500;
+// Cooldown alzato a 24 secondi per forzarli a separarsi dopo i salti
+const POD_COOLDOWN = 24;
+const DIVE_DURATION_RANGE: [number, number] = [1.15, 1.55];
+
+const MODEL_HEADING_OFFSET = Math.PI;
+
 function lerp(a: number, b: number, t: number) {
   return a + (b - a) * t;
+}
+
+function lerpAngle(a: number, b: number, t: number) {
+  return a + shortAngleDiff(a, b) * t;
 }
 
 function frontArcPosition(radius: number, angleDeg: number, y: number) {
@@ -93,46 +153,88 @@ function randomIndex(random: () => number, max: number) {
   return Math.floor(random() * max);
 }
 
-function horizontalDistance(a: THREE.Vector3, b: THREE.Vector3) {
-  const dx = a.x - b.x;
-  const dz = a.z - b.z;
-  return Math.hypot(dx, dz);
+function getAnimationDuration(durations: readonly number[], index: number, fallback: number) {
+  return durations[index] ?? fallback;
 }
 
-function lerpAngle(current: number, target: number, alpha: number) {
-  const delta = Math.atan2(Math.sin(target - current), Math.cos(target - current));
-  return current + delta * alpha;
+function horizontalDistance(a: THREE.Vector3, b: THREE.Vector3) {
+  return Math.hypot(a.x - b.x, a.z - b.z);
+}
+
+function smootherstep(t: number): number {
+  const c = THREE.MathUtils.clamp(t, 0, 1);
+  return c * c * c * (c * (c * 6 - 15) + 10);
+}
+
+function shortAngleDiff(from: number, to: number): number {
+  return Math.atan2(Math.sin(to - from), Math.cos(to - from));
+}
+
+function normalizeAngle(angle: number) {
+  return Math.atan2(Math.sin(angle), Math.cos(angle));
+}
+
+function quadraticBezier(a: number, b: number, c: number, t: number) {
+  const i = 1 - t;
+  return i * i * a + 2 * i * t * b + t * t * c;
+}
+
+function chooseViaPoint(
+  random: () => number,
+  from: THREE.Vector3,
+  to: THREE.Vector3
+): THREE.Vector3 {
+  const t = 0.35 + random() * 0.3;
+  const mid = from.clone().lerp(to, t);
+  const dx = to.x - from.x;
+  const dz = to.z - from.z;
+  const len = Math.hypot(dx, dz) + 0.001;
+  const sign = random() > 0.5 ? 1 : -1;
+  const curve = sign * len * (0.18 + random() * 0.22);
+
+  return new THREE.Vector3(mid.x + (-dz / len) * curve, 0, mid.z + (dx / len) * curve);
+}
+
+function chooseSoloJumpCount(random: () => number) {
+  const roll = random();
+  if (roll < 0.5) return 1;
+  if (roll < 0.78) return 2;
+  if (roll < 0.94) return 3;
+  return 4;
+}
+
+// Aggiornato per gestire la modalità gara (4 o 5 salti) o normale (3 o 4)
+function choosePodJumpCount(random: () => number, isRacing: boolean) {
+  if (isRacing) return random() < 0.5 ? 4 : 5;
+  return random() < 0.52 ? 3 : 4;
+}
+
+function choosePodParticipantGoal(random: () => number) {
+  return random() < 0.58 ? 2 : 3;
 }
 
 function getRandomValues(count: number) {
   const values = new Uint32Array(count);
-
   if (typeof crypto !== "undefined" && typeof crypto.getRandomValues === "function") {
     crypto.getRandomValues(values);
     return values;
   }
-
   const now = Date.now() >>> 0;
-  for (let i = 0; i < count; i++) {
-    values[i] = (now + i * 2_654_435_761) >>> 0;
-  }
-
+  for (let i = 0; i < count; i += 1) values[i] = (now + i * 2_654_435_761) >>> 0;
   return values;
 }
 
 function createEncounterSet(): EncounterSet {
-  const values = getRandomValues(4);
+  const values = getRandomValues(3);
   return {
     dolphinSeedA: values[0],
     dolphinSeedB: values[1],
     dolphinSeedC: values[2],
-    whaleSeed: values[3],
   };
 }
 
 function useAnimatedClonedModel(url: string, tuning: MaterialTuning) {
   const { scene, animations } = useGLTF(url);
-
   const model = useMemo(() => {
     const clone = cloneSkeleton(scene) as THREE.Group;
     enhanceModelMaterials(clone, tuning);
@@ -153,192 +255,18 @@ function enhanceModelMaterials(model: THREE.Object3D, tuning: MaterialTuning) {
     const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
     for (const material of materials) {
       if (!material) continue;
-
-      if ("envMapIntensity" in material) {
-        material.envMapIntensity = tuning.envMapIntensity;
-      }
-
-      if ("roughness" in material && tuning.roughness !== undefined) {
-        material.roughness = tuning.roughness;
-      }
-
-      if ("metalness" in material && tuning.metalness !== undefined) {
-        material.metalness = tuning.metalness;
-      }
-
+      if ("envMapIntensity" in material) material.envMapIntensity = tuning.envMapIntensity;
+      if ("roughness" in material && tuning.roughness !== undefined) material.roughness = tuning.roughness;
+      if ("metalness" in material && tuning.metalness !== undefined) material.metalness = tuning.metalness;
       if ("color" in material && tuning.colorBoost !== undefined) {
-        const colorMaterial = material as THREE.Material & { color: THREE.Color };
-        colorMaterial.color.multiplyScalar(tuning.colorBoost);
+        (material as THREE.MeshStandardMaterial).color.multiplyScalar(tuning.colorBoost);
       }
-
       if ("emissive" in material && tuning.emissiveBoost !== undefined) {
-        const emissiveMaterial = material as THREE.Material & { emissive: THREE.Color };
-        emissiveMaterial.emissive.multiplyScalar(tuning.emissiveBoost);
+        (material as THREE.MeshStandardMaterial).emissive.multiplyScalar(tuning.emissiveBoost);
       }
-
-      if ("needsUpdate" in material) {
-        material.needsUpdate = true;
-      }
+      if ("needsUpdate" in material) material.needsUpdate = true;
     }
   });
-}
-
-const CREATURE_TUNING: MaterialTuning = {
-  envMapIntensity: 0.48,
-  roughness: 0.92,
-  metalness: 0.02,
-  colorBoost: 1.02,
-  emissiveBoost: 1.01,
-};
-
-const PROMONTORY_TUNING: MaterialTuning = {
-  envMapIntensity: 3,
-  roughness: 0,
-  metalness: 0,
-  colorBoost: 1.01,
-  emissiveBoost: 1.02,
-};
-
-const ROCK_REEF_TUNING: MaterialTuning = {
-  envMapIntensity: 2.16,
-  roughness: 1.92,
-  metalness: 0.03,
-  colorBoost: 1.05,
-  emissiveBoost: 2.04,
-};
-
-const CLIFF_TUNING: MaterialTuning = {
-  envMapIntensity: 2.16,
-  roughness: 1.92,
-  metalness: 0.03,
-  colorBoost: 1.18,
-  emissiveBoost: 2.04,
-};
-
-const CLIFF_GROUP_TUNING_1: MaterialTuning = {
-  envMapIntensity: 1.08,
-  roughness: 0.34,
-  metalness: 0,
-  colorBoost: 1.28,
-  emissiveBoost: 1.04,
-};
-
-const CLIFF_GROUP_TUNING_2: MaterialTuning = {
-  envMapIntensity: 1.08,
-  roughness: 0.34,
-  metalness: 0,
-  colorBoost: 1.3,
-  emissiveBoost: 1.04,
-};
-
-const VOLCANO_TUNING: MaterialTuning = {
-  envMapIntensity: 1.35,
-  roughness: 0.9,
-  metalness: 0.03,
-  colorBoost: 1.04,
-  emissiveBoost: 1.05,
-};
-
-const CREATURE_OBSTACLES: ObstacleArea[] = [
-  { position: frontArcPosition(2000, 80, -14), radius: 290 },
-  { position: frontArcPosition(200, 200, -2), radius: 210 },
-  { position: frontArcPosition(170, 210, 0), radius: 190 },
-  { position: frontArcPosition(230, 180, 0), radius: 210 },
-  { position: frontArcPosition(900, 180, -3), radius: 280 },
-];
-
-const DOLPHIN_MOTION: MarineMotionConfig = {
-  behavior: "dolphin",
-  radiusRange: [220, 1_350],
-  angleRange: [20, 340],
-  depthRange: [-0.42, -0.08],
-  speedRange: [34, 58],
-  targetInterval: [4.5, 10],
-  avoidanceRadius: 260,
-  socialDistance: 170,
-  turnSpeed: 3.2,
-  bankFactor: 0.013,
-  pitchFactor: 0.24,
-  swayAmount: 0.08,
-  swaySpeed: 1.55,
-  animationSpeedRange: [0.96, 1.24],
-  actionInterval: [5.5, 12],
-  actionDuration: [1.1, 2],
-};
-
-const WHALE_MOTION: MarineMotionConfig = {
-  behavior: "whale",
-  radiusRange: [520, 1_950],
-  angleRange: [30, 330],
-  depthRange: [-1.95, -0.72],
-  speedRange: [18, 34],
-  targetInterval: [10, 18],
-  avoidanceRadius: 340,
-  socialDistance: 250,
-  turnSpeed: 1.7,
-  bankFactor: 0.008,
-  pitchFactor: 0.13,
-  swayAmount: 0.06,
-  swaySpeed: 0.55,
-  animationSpeedRange: [0.62, 0.88],
-  actionInterval: [12, 22],
-  actionDuration: [2.6, 4.4],
-};
-
-function chooseCreatureTarget(random: () => number, config: MarineMotionConfig) {
-  for (let attempt = 0; attempt < 30; attempt++) {
-    const angle = randomRange(random, config.angleRange[0], config.angleRange[1]);
-    const radius = randomRange(random, config.radiusRange[0], config.radiusRange[1]);
-    const depth = randomRange(random, config.depthRange[0], config.depthRange[1]);
-    const position = frontArcPosition(radius, angle, depth);
-
-    const nearObstacle = CREATURE_OBSTACLES.some((obstacle) => {
-      return (
-        horizontalDistance(position, obstacle.position) < obstacle.radius + config.avoidanceRadius
-      );
-    });
-
-    if (!nearObstacle) {
-      return position;
-    }
-  }
-
-  return frontArcPosition(
-    (config.radiusRange[0] + config.radiusRange[1]) * 0.5,
-    (config.angleRange[0] + config.angleRange[1]) * 0.5,
-    (config.depthRange[0] + config.depthRange[1]) * 0.5
-  );
-}
-
-function nearestObstacleDistance(position: THREE.Vector3) {
-  let minDistance = Number.POSITIVE_INFINITY;
-
-  for (const obstacle of CREATURE_OBSTACLES) {
-    minDistance = Math.min(minDistance, horizontalDistance(position, obstacle.position));
-  }
-
-  return minDistance;
-}
-
-function createMarineMotionState(
-  random: () => number,
-  config: MarineMotionConfig
-): MarineMotionState {
-  const position = chooseCreatureTarget(random, config);
-  const target = chooseCreatureTarget(random, config);
-  const speed = randomRange(random, config.speedRange[0], config.speedRange[1]);
-  const velocity = target.clone().sub(position).setLength(speed);
-
-  return {
-    position,
-    velocity,
-    target,
-    speed,
-    retargetAt: randomRange(random, config.targetInterval[0], config.targetInterval[1]),
-    actionAt: randomRange(random, config.actionInterval[0], config.actionInterval[1]),
-    actionDuration: randomRange(random, config.actionDuration[0], config.actionDuration[1]),
-    actionStyle: randomIndex(random, config.behavior === "dolphin" ? 7 : 6),
-  };
 }
 
 function useClipPlayback(
@@ -359,8 +287,8 @@ function useClipPlayback(
 
     action.reset();
     action.setLoop(THREE.LoopRepeat, Infinity);
-    action.time = playbackRandom() * clip.duration;
-    action.timeScale = randomRange(playbackRandom, speedRange[0], speedRange[1]);
+    action.getMixer().setTime(playbackRandom() * clip.duration);
+    action.setEffectiveTimeScale(randomRange(playbackRandom, speedRange[0], speedRange[1]));
     action.fadeIn(0.35);
     action.play();
 
@@ -371,110 +299,281 @@ function useClipPlayback(
   }, [actions, animations, playbackRandom, speedRange]);
 }
 
-function getDolphinAction(style: number, progress: number): SurfaceAction {
-  const arc = Math.sin(progress * Math.PI);
+const CREATURE_TUNING: MaterialTuning = {
+  envMapIntensity: 1.7,
+  roughness: 0.62,
+  metalness: 0.02,
+  colorBoost: 1.0,
+  emissiveBoost: 1.01,
+};
+const PROMONTORY_TUNING: MaterialTuning = {
+  envMapIntensity: 3,
+  roughness: 0,
+  metalness: 0,
+  colorBoost: 1.01,
+  emissiveBoost: 1.02,
+};
 
-  switch (style) {
-    case 0:
-      return {
-        visible: arc > 0.03,
-        lift: arc * 3.1,
-        pitch: lerp(-0.82, 0.42, progress),
-        roll: 0,
-        yaw: 0,
-      };
-    case 1:
-      return {
-        visible: arc > 0.03,
-        lift: arc * 2.35,
-        pitch: -0.05,
-        roll: progress * Math.PI * 4.6,
-        yaw: 0,
-      };
-    case 2:
-      return {
-        visible: arc > 0.03,
-        lift: arc * 1.7,
-        pitch: lerp(-0.32, 0.58, progress),
-        roll: 0,
-        yaw: 0,
-      };
-    case 3: {
-      const slapArc = progress < 0.52 ? Math.sin((progress / 0.52) * Math.PI) : 0;
-      return { visible: slapArc > 0.03, lift: slapArc * 1.15, pitch: 0.62, roll: 0, yaw: 0 };
-    }
-    case 4: {
-      const porpoise = Math.max(0, Math.sin(progress * Math.PI * 3.8)) * 0.75;
-      return {
-        visible: porpoise > 0.03,
-        lift: porpoise,
-        pitch: 0.12 + Math.sin(progress * Math.PI * 2) * 0.16,
-        roll: 0,
-        yaw: 0,
-      };
-    }
-    case 5:
-      return {
-        visible: arc > 0.03,
-        lift: arc * 1.95,
-        pitch: lerp(-0.46, 0.12, progress),
-        roll: Math.sin(progress * Math.PI) * 1.18,
-        yaw: 0,
-      };
-    default:
-      return {
-        visible: arc > 0.03,
-        lift: arc * 2.2,
-        pitch: progress * Math.PI * 2 - 0.9,
-        roll: 0,
-        yaw: 0,
-      };
+const ROCK_REEF_TUNING: MaterialTuning = {
+  envMapIntensity: 2.16,
+  roughness: 1.92,
+  metalness: 0.03,
+  colorBoost: 1.05,
+  emissiveBoost: 2.04,
+};
+
+const CLIFF_TUNING: MaterialTuning = {
+  envMapIntensity: 3,
+  roughness: 0.62,
+  metalness: 0.03,
+  colorBoost: 2,
+  emissiveBoost: 1.04,
+};
+
+const CLIFF_GROUP_TUNING_1: MaterialTuning = {
+  envMapIntensity: 3,
+  roughness: 0.34,
+  metalness: 0,
+  colorBoost: 4,
+  emissiveBoost: 1.04,
+};
+
+const CLIFF_GROUP_TUNING_2: MaterialTuning = {
+  envMapIntensity: 3,
+  roughness: 0.9,
+  metalness: 0,
+  colorBoost: 3.5,
+  emissiveBoost: 1.04,
+};
+
+const VOLCANO_TUNING: MaterialTuning = {
+  envMapIntensity: 1.35,
+  roughness: 0.9,
+  metalness: 0.03,
+  colorBoost: 1.3,
+  emissiveBoost: 1.05,
+};
+
+const CREATURE_OBSTACLES: ObstacleArea[] = [
+  { position: frontArcPosition(2000, 80, -14), radius: 290 },
+  { position: frontArcPosition(200, 200, -2), radius: 210 },
+  { position: frontArcPosition(170, 210, 0), radius: 190 },
+  { position: frontArcPosition(230, 180, 0), radius: 210 },
+  { position: frontArcPosition(900, 180, -3), radius: 280 },
+];
+
+const DOLPHIN_MOTION: DolphinMotionConfig = {
+  radiusRange: [120, 2_000],
+  angleRange: [12, 348],
+  speedRange: [28, 46],
+  targetInterval: [4.5, 9.5],
+  avoidanceRadius: 260,
+  socialDistance: 165,
+  turnSpeed: 3.4,
+  bankFactor: 0.012,
+  swayAmount: 0.1,
+  swaySpeed: 1.65,
+  animationSpeedRange: [0.96, 1.18],
+  actionInterval: [4.8, 11.5],
+  maxAcceleration: 190,
+  headingDamping: 0.1,
+  cruiseDepthRange: [-8.8, -5.2],
+  approachDepthRange: [-5.8, -5.7],
+};
+
+function chooseCreatureTarget(random: () => number, config: DolphinMotionConfig) {
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    const angle = randomRange(random, config.angleRange[0], config.angleRange[1]);
+    const radius = randomRange(random, config.radiusRange[0], config.radiusRange[1]);
+    const position = frontArcPosition(radius, angle, 0);
+    const nearObstacle = CREATURE_OBSTACLES.some((obstacle) => {
+      return horizontalDistance(position, obstacle.position) < obstacle.radius + config.avoidanceRadius;
+    });
+
+    if (!nearObstacle) return position;
   }
+
+  return frontArcPosition(
+    (config.radiusRange[0] + config.radiusRange[1]) * 0.5,
+    (config.angleRange[0] + config.angleRange[1]) * 0.5,
+    0
+  );
 }
 
-function getWhaleAction(style: number, progress: number): SurfaceAction {
-  const arc = Math.sin(progress * Math.PI);
+function nearestObstacleDistance(position: THREE.Vector3) {
+  let min = Infinity;
+  for (const obstacle of CREATURE_OBSTACLES) {
+    min = Math.min(min, horizontalDistance(position, obstacle.position));
+  }
+  return min;
+}
+
+function createDolphinMotionState(
+  random: () => number,
+  config: DolphinMotionConfig
+): DolphinMotionState {
+  const position = chooseCreatureTarget(random, config);
+  position.y = 0;
+
+  const target = chooseCreatureTarget(random, config);
+  target.y = 0;
+
+  const viaPoint = chooseViaPoint(random, position, target);
+  const speed = randomRange(random, config.speedRange[0], config.speedRange[1]);
+  const velocity = viaPoint.clone().sub(position).normalize().multiplyScalar(speed);
+  const heading = Math.atan2(velocity.x, -velocity.z);
+  const cruiseDepth = randomRange(random, config.cruiseDepthRange[0], config.cruiseDepthRange[1]);
+  const approachDepth = randomRange(random, config.approachDepthRange[0], config.approachDepthRange[1]);
+  const actionStyle = randomIndex(random, DOLPHIN_ANIM_COUNT);
+
+  return {
+    position,
+    velocity,
+    target,
+    viaPoint,
+    usingViaPoint: true,
+    speed,
+    retargetAt: randomRange(random, config.targetInterval[0], config.targetInterval[1]),
+    actionAt: randomRange(random, config.actionInterval[0], config.actionInterval[1]),
+    actionStyle,
+    actionDuration: getAnimationDuration(DOLPHIN_ANIM_DURATION, actionStyle, 1.8),
+    heading,
+    headingOmega: 0,
+    phase: "cruise",
+    phaseEnteredAt: 0,
+    launchAt: 0,
+    jumpHeading: heading,
+    jumpVelocity: velocity.clone(),
+    renderDepth: cruiseDepth,
+    cruiseDepth,
+    approachDepth,
+    launchDepth: approachDepth,
+    diveMidDepth: cruiseDepth,
+    diveTargetDepth: cruiseDepth,
+    diveDuration: DIVE_DURATION_RANGE[0],
+    exitPitch: 0,
+    exitRoll: 0,
+    sequenceRemaining: 0,
+    podCooldownUntil: 0,
+    isRacing: false,
+  };
+}
+
+function configureNextJump(
+  motion: DolphinMotionState,
+  random: () => number,
+  config: DolphinMotionConfig,
+  elapsed: number,
+  launchDelay: number
+) {
+  // Se stanno gareggiando, forziamo il salto ad arco in avanti
+  motion.actionStyle = motion.isRacing ? DOLPHIN_ANIM.ARCING_LEAP : randomIndex(random, DOLPHIN_ANIM_COUNT);
+  motion.actionDuration = getAnimationDuration(DOLPHIN_ANIM_DURATION, motion.actionStyle, 1.8);
+  motion.approachDepth = randomRange(random, config.approachDepthRange[0], config.approachDepthRange[1]);
+  motion.launchDepth = motion.approachDepth;
+  motion.phase = "surface_approach";
+  motion.phaseEnteredAt = elapsed;
+  motion.launchAt = elapsed + launchDelay;
+}
+
+function startJumpSequence(
+  motion: DolphinMotionState,
+  random: () => number,
+  config: DolphinMotionConfig,
+  elapsed: number,
+  jumpCount: number,
+  launchDelay: number
+) {
+  motion.sequenceRemaining = jumpCount - 1;
+  motion.headingOmega *= 0.18;
+  configureNextJump(motion, random, config, elapsed, launchDelay);
+}
+
+function beginDiveRecovery(
+  motion: DolphinMotionState,
+  random: () => number,
+  elapsed: number
+) {
+  const exitAction = getDolphinAction(motion.actionStyle, 1);
+  motion.phase = "dive_recovery";
+  motion.phaseEnteredAt = elapsed;
+  motion.diveDuration = randomRange(random, DIVE_DURATION_RANGE[0], DIVE_DURATION_RANGE[1]);
+  motion.exitPitch = normalizeAngle(exitAction.pitch);
+  motion.exitRoll = normalizeAngle(exitAction.roll);
+  motion.diveTargetDepth =
+    motion.sequenceRemaining > 0 ? randomRange(random, -5.2, -4.2) : motion.cruiseDepth;
+  motion.diveMidDepth =
+    motion.sequenceRemaining > 0
+      ? Math.min(motion.diveTargetDepth - 2.2, -8.2)
+      : Math.min(motion.diveTargetDepth - 2.8, -10.4);
+  motion.renderDepth = motion.launchDepth;
+}
+
+function commitSharedPosition(
+  sharedPositionsRef: MutableRefObject<Record<string, THREE.Vector3>>,
+  id: string,
+  position: THREE.Vector3,
+  depth: number
+) {
+  const registered = sharedPositionsRef.current[id] ?? new THREE.Vector3();
+  registered.set(position.x, WATER_SURFACE_Y + depth, position.z);
+  sharedPositionsRef.current[id] = registered;
+}
+
+function getDolphinAction(style: number, t: number): SurfaceAction {
+  const p = smootherstep(t);
+  const arc = Math.sin(p * Math.PI);
+  const spin = smootherstep(THREE.MathUtils.clamp((t - 0.12) / 0.76, 0, 1));
 
   switch (style) {
-    case 0:
+    case DOLPHIN_ANIM.CLASSIC_LEAP:
       return {
-        visible: true,
-        lift: arc * 3.25,
-        pitch: lerp(-0.7, 0.35, progress),
+        lift: arc * 15.5,
+        pitch: -lerp(0.62, -0.48, p),   
         roll: 0,
         yaw: 0,
       };
-    case 1:
+
+    case DOLPHIN_ANIM.ARCING_LEAP:
       return {
-        visible: true,
-        lift: arc * 1.75,
-        pitch: lerp(-0.4, 0.14, progress),
-        roll: 0,
+        lift: arc * 18.4,
+        pitch: -lerp(0.78, -0.58, p),   
+        roll: Math.sin(p * Math.PI) * 0.12,
         yaw: 0,
       };
-    case 2:
+
+    case DOLPHIN_ANIM.SIDE_FLIP:
       return {
-        visible: true,
-        lift: arc * 2.35,
-        pitch: lerp(-0.5, 0.2, progress),
-        roll: Math.sin(progress * Math.PI) * 0.86,
-        yaw: Math.sin(progress * Math.PI) * 0.18,
-      };
-    case 3:
-      return {
-        visible: true,
-        lift: arc * 2.05,
-        pitch: lerp(-0.44, 0.06, progress),
-        roll: lerp(0, 1.1, progress),
+        lift: arc * 13,
+        pitch: -lerp(0.38, -0.26, p),   
+        roll: Math.sin(p * Math.PI) * 1.28,
         yaw: 0,
       };
-    case 4: {
-      const headArc =
-        progress < 0.58 ? Math.sin((progress / 0.58) * Math.PI) : Math.max(0, 1 - progress) * 0.7;
-      return { visible: true, lift: headArc * 2.3, pitch: -0.76, roll: 0, yaw: 0 };
-    }
+
+    case DOLPHIN_ANIM.FRONT_FLIP:
+      return {
+        lift: arc * 17.1,
+        pitch: -(lerp(0.4, -0.22, p) - spin * Math.PI * 2),  
+        roll: Math.sin(p * Math.PI) * 0.14,
+        yaw: 0,
+      };
+
+    case DOLPHIN_ANIM.BACK_FLIP:
+      return {
+        lift: arc * 18.1,
+        pitch: -(lerp(0.6, -0.18, p) + spin * Math.PI * 2),  
+        roll: Math.sin(p * Math.PI) * 0.1,
+        yaw: 0,
+      };
+
+    case DOLPHIN_ANIM.TWIST_FLIP:
     default:
-      return { visible: true, lift: arc * 0.98, pitch: 0.68, roll: 0, yaw: 0 };
+      return {
+        lift: arc * 17.6,
+        pitch: -(lerp(0.52, -0.2, p) + spin * Math.PI * 1.7), 
+        roll: Math.sin(spin * Math.PI) * Math.PI * 0.88,
+        yaw: 0,
+      };
   }
 }
 
@@ -499,8 +598,9 @@ function EncounterLightRig() {
       !hemiLightRef.current ||
       !ambientLightRef.current ||
       !targetRef.current
-    )
+    ) {
       return;
+    }
 
     const scene = getSceneSnapshot(getSceneDate(), sceneParams.location);
 
@@ -511,10 +611,7 @@ function EncounterLightRig() {
     sunLightRef.current.intensity = THREE.MathUtils.lerp(0.26, 1.95, 1 - scene.nightFactor);
 
     _glareOffset.current.set(120, 58, 190);
-    glareLightRef.current.position
-      .copy(_sunVector.current)
-      .multiplyScalar(280)
-      .add(_glareOffset.current);
+    glareLightRef.current.position.copy(_sunVector.current).multiplyScalar(280).add(_glareOffset.current);
     glareLightRef.current.target = targetRef.current;
     glareLightRef.current.color.setHex(scene.sunColorHex);
     glareLightRef.current.intensity = THREE.MathUtils.lerp(0.05, 0.94, 1 - scene.nightFactor);
@@ -535,11 +632,7 @@ function EncounterLightRig() {
     hemiLightRef.current.groundColor.setHex(0x092236);
 
     ambientLightRef.current.color.setHex(scene.lightColorHex);
-    ambientLightRef.current.intensity = THREE.MathUtils.lerp(
-      0.12,
-      0.34,
-      1 - scene.nightFactor * 0.4
-    );
+    ambientLightRef.current.intensity = THREE.MathUtils.lerp(0.12, 0.34, 1 - scene.nightFactor * 0.4);
   });
 
   return (
@@ -557,10 +650,9 @@ function EncounterLightRig() {
 
 function PromontoryEncounter() {
   const { model } = useAnimatedClonedModel("/models/promontory.glb", PROMONTORY_TUNING);
-  const position = useMemo(() => frontArcPosition(2000, 80, -14), []);
-
+  const position = useMemo(() => frontArcPosition(2000, 20, -14), []);
   return (
-    <group position={position} scale={2} rotation={[0, -0.5, 0]}>
+    <group position={position} scale={2} rotation={[0, -0.2, 0]}>
       <primitive object={model} />
     </group>
   );
@@ -569,9 +661,8 @@ function PromontoryEncounter() {
 function CliffEncounter() {
   const { model } = useAnimatedClonedModel("/models/cliff_rock.glb", CLIFF_TUNING);
   const position = useMemo(() => frontArcPosition(200, 200, -2), []);
-
   return (
-    <group position={position} scale={1}>
+    <group position={position}>
       <primitive object={model} />
     </group>
   );
@@ -580,7 +671,6 @@ function CliffEncounter() {
 function CliffGroup1Encounter() {
   const { model } = useAnimatedClonedModel("/models/group_of_cliff_1.glb", CLIFF_GROUP_TUNING_1);
   const position = useMemo(() => frontArcPosition(170, 210, 0), []);
-
   return (
     <group position={position} scale={0.01}>
       <primitive object={model} />
@@ -591,7 +681,6 @@ function CliffGroup1Encounter() {
 function CliffGroup2Encounter() {
   const { model } = useAnimatedClonedModel("/models/group_of_cliff_2.glb", CLIFF_GROUP_TUNING_2);
   const position = useMemo(() => frontArcPosition(230, 180, 0), []);
-
   return (
     <group position={position} scale={0.01} rotation={[0, 1, 0]}>
       <primitive object={model} />
@@ -602,7 +691,6 @@ function CliffGroup2Encounter() {
 function VolcanoEncounter() {
   const { model } = useAnimatedClonedModel("/models/volcano.glb", VOLCANO_TUNING);
   const position = useMemo(() => frontArcPosition(3000, 275, -2), []);
-
   return (
     <group position={position} scale={4}>
       <primitive object={model} />
@@ -612,214 +700,379 @@ function VolcanoEncounter() {
 
 function RockReefEncounter() {
   const { model } = useAnimatedClonedModel("/models/rock_reef.glb", ROCK_REEF_TUNING);
-  const position = useMemo(() => frontArcPosition(900, 180, -3), []);
-
+  const position = useMemo(() => frontArcPosition(900, 150, -3), []);
   return (
-    <group position={position} scale={1} rotation={[0, 1, 0]}>
+    <group position={position} rotation={[0, 1, 0]}>
       <primitive object={model} />
     </group>
   );
 }
 
-function MarineCreatureEncounter({
+function DolphinEncounter({
   id,
-  url,
   seed,
   scale,
-  config,
   sharedPositionsRef,
+  podRef,
 }: {
   id: string;
-  url: string;
   seed: number;
   scale: number;
-  config: MarineMotionConfig;
-  sharedPositionsRef: React.MutableRefObject<Record<string, THREE.Vector3>>;
+  sharedPositionsRef: MutableRefObject<Record<string, THREE.Vector3>>;
+  podRef: MutableRefObject<PodAnnouncement | null>;
 }) {
   const groupRef = useRef<THREE.Group>(null);
-  const { model, animations } = useAnimatedClonedModel(url, CREATURE_TUNING);
+  const { model, animations } = useAnimatedClonedModel("/models/dolphin.glb", CREATURE_TUNING);
   const random = useMemo(() => createSeededRandom(seed), [seed]);
-  const motionRef = useRef<MarineMotionState | null>(null);
-  const desiredVelocityRef = useRef(new THREE.Vector3());
+  const initialMotion = useMemo(() => createDolphinMotionState(random, DOLPHIN_MOTION), [random]);
+  const motionRef = useRef<DolphinMotionState>(initialMotion);
+
+  const desiredVelRef = useRef(new THREE.Vector3());
+  const steeringRef = useRef(new THREE.Vector3());
   const avoidanceRef = useRef(new THREE.Vector3());
   const awayRef = useRef(new THREE.Vector3());
-  const sideRef = useRef(new THREE.Vector3());
+  const jumpDirRef = useRef(new THREE.Vector3());
 
-  useClipPlayback(model, animations, seed, config.animationSpeedRange);
+  useClipPlayback(model, animations, seed, DOLPHIN_MOTION.animationSpeedRange);
 
   useEffect(() => {
+    const sharedPositions = sharedPositionsRef.current;
+
+    if (groupRef.current) {
+      groupRef.current.rotation.order = "YXZ";
+    }
+
     return () => {
-      delete sharedPositionsRef.current[id];
+      delete sharedPositions[id];
     };
   }, [id, sharedPositionsRef]);
 
-  if (!motionRef.current) {
-    motionRef.current = createMarineMotionState(random, config);
-  }
-
   useFrame((state, delta) => {
-    if (!groupRef.current || !motionRef.current) return;
+    if (!groupRef.current) return;
 
+    const group = groupRef.current;
     const motion = motionRef.current;
     const elapsed = state.clock.elapsedTime;
-    const closeToTarget = motion.position.distanceToSquared(motion.target) < 90 * 90;
+    const dt = Math.min(delta, 0.05);
 
-    if (elapsed >= motion.retargetAt || closeToTarget) {
-      motion.target.copy(chooseCreatureTarget(random, config));
-      motion.speed = randomRange(random, config.speedRange[0], config.speedRange[1]);
+    if (podRef.current && elapsed > podRef.current.expiresAt) {
+      podRef.current = null;
+    }
+
+    if (motion.phase === "airborne") {
+      const rawT = (elapsed - motion.phaseEnteredAt) / motion.actionDuration;
+
+      if (rawT >= 1) {
+        beginDiveRecovery(motion, random, elapsed);
+        commitSharedPosition(sharedPositionsRef, id, motion.position, motion.renderDepth);
+        return;
+      }
+
+      const action = getDolphinAction(motion.actionStyle, rawT);
+      motion.position.addScaledVector(motion.jumpVelocity, dt);
+
+      group.position.set(
+        motion.position.x,
+        WATER_SURFACE_Y + motion.launchDepth + action.lift,
+        motion.position.z
+      );
+      group.rotation.y = motion.jumpHeading + action.yaw + MODEL_HEADING_OFFSET;
+      group.rotation.x = action.pitch;
+      group.rotation.z = action.roll;
+
+      commitSharedPosition(sharedPositionsRef, id, motion.position, motion.launchDepth + action.lift);
+      return;
+    }
+
+    if (motion.phase === "dive_recovery") {
+      const progress = THREE.MathUtils.clamp((elapsed - motion.phaseEnteredAt) / motion.diveDuration, 0, 1);
+      const eased = smootherstep(progress);
+      
+      // FIX FLUIDITÀ: Manteniamo il 100% dell'inerzia sott'acqua anziché rallentare
+      const forwardFactor = 1.0; 
+      
+      const recoveryPitch = motion.sequenceRemaining > 0 ? 0.16 : 0;
+
+      motion.position.addScaledVector(motion.jumpVelocity, dt * forwardFactor);
+      motion.renderDepth = quadraticBezier(
+        motion.launchDepth,
+        motion.diveMidDepth,
+        motion.diveTargetDepth,
+        eased
+      );
+
+      group.position.set(motion.position.x, WATER_SURFACE_Y + motion.renderDepth, motion.position.z);
+      group.rotation.y = motion.jumpHeading + MODEL_HEADING_OFFSET;
+      group.rotation.x = lerpAngle(motion.exitPitch, recoveryPitch, eased);
+      group.rotation.z = lerpAngle(motion.exitRoll, 0, eased);
+
+      commitSharedPosition(sharedPositionsRef, id, motion.position, motion.renderDepth);
+
+      if (progress >= 1) {
+        motion.velocity.copy(motion.jumpVelocity);
+        motion.heading = motion.jumpHeading;
+        motion.headingOmega = 0;
+
+        if (motion.sequenceRemaining > 0) {
+          motion.sequenceRemaining -= 1;
+          configureNextJump(motion, random, DOLPHIN_MOTION, elapsed, randomRange(random, 0.3, 0.7));
+          motion.renderDepth = motion.diveTargetDepth;
+        } else {
+          motion.isRacing = false; // Finita la sequenza, si resetta la modalità gara
+          motion.phase = "cruise";
+          motion.phaseEnteredAt = elapsed;
+          motion.cruiseDepth = randomRange(
+            random,
+            DOLPHIN_MOTION.cruiseDepthRange[0],
+            DOLPHIN_MOTION.cruiseDepthRange[1]
+          );
+          motion.renderDepth = motion.cruiseDepth;
+          motion.actionAt = elapsed + randomRange(
+            random,
+            DOLPHIN_MOTION.actionInterval[0],
+            DOLPHIN_MOTION.actionInterval[1]
+          );
+        }
+      }
+
+      return;
+    }
+
+    const isSurfaceApproach = motion.phase === "surface_approach";
+    const activeTarget = motion.usingViaPoint ? motion.viaPoint : motion.target;
+
+    if (motion.usingViaPoint && motion.position.distanceToSquared(activeTarget) < 75 * 75) {
+      motion.usingViaPoint = false;
+    }
+
+    if (
+      elapsed >= motion.retargetAt ||
+      (!motion.usingViaPoint && motion.position.distanceToSquared(motion.target) < 90 * 90)
+    ) {
+      const newTarget = chooseCreatureTarget(random, DOLPHIN_MOTION);
+      newTarget.y = 0;
+      motion.viaPoint.copy(chooseViaPoint(random, motion.position, newTarget));
+      motion.target.copy(newTarget);
+      motion.usingViaPoint = true;
+      motion.speed = randomRange(random, DOLPHIN_MOTION.speedRange[0], DOLPHIN_MOTION.speedRange[1]);
       motion.retargetAt =
-        elapsed + randomRange(random, config.targetInterval[0], config.targetInterval[1]);
+        elapsed + randomRange(random, DOLPHIN_MOTION.targetInterval[0], DOLPHIN_MOTION.targetInterval[1]);
     }
 
-    desiredVelocityRef.current.copy(motion.target).sub(motion.position);
-
-    if (desiredVelocityRef.current.lengthSq() > 0.001) {
-      desiredVelocityRef.current.normalize().multiplyScalar(motion.speed);
+    desiredVelRef.current.copy(activeTarget).sub(motion.position).setY(0);
+    if (desiredVelRef.current.lengthSq() > 0.001) {
+      desiredVelRef.current.normalize().multiplyScalar(motion.speed);
     } else {
-      desiredVelocityRef.current.set(0, 0, -motion.speed);
+      desiredVelRef.current.set(0, 0, -motion.speed);
     }
 
-    const stroke = Math.sin(elapsed * (config.swaySpeed * 2.9) + seed * 0.00031);
-    const swimPulse =
-      config.behavior === "dolphin" ? 0.8 + Math.max(0, stroke) * 0.34 : 0.9 + stroke * 0.12;
-    desiredVelocityRef.current.multiplyScalar(swimPulse);
+    const s1 = Math.sin(elapsed * DOLPHIN_MOTION.swaySpeed * 2.9 + seed * 0.00031);
+    const s2 = Math.sin(elapsed * DOLPHIN_MOTION.swaySpeed * 1.73 + seed * 0.00053) * 0.28;
+    const pulse = 0.86 + Math.max(0, s1) * 0.24 + s2 * 0.06;
+    desiredVelRef.current.multiplyScalar(pulse);
 
     avoidanceRef.current.set(0, 0, 0);
 
     for (const obstacle of CREATURE_OBSTACLES) {
       const distance = horizontalDistance(motion.position, obstacle.position);
-      const clearance = obstacle.radius + config.avoidanceRadius;
+      const clearance = obstacle.radius + DOLPHIN_MOTION.avoidanceRadius;
+      if (distance >= clearance) continue;
 
-      if (distance < clearance) {
-        awayRef.current.copy(motion.position).sub(obstacle.position).setY(0);
+      awayRef.current.copy(motion.position).sub(obstacle.position).setY(0);
+      if (awayRef.current.lengthSq() < 0.001) awayRef.current.set(1, 0, 0);
+      awayRef.current.normalize().multiplyScalar(((clearance - distance) / clearance) * motion.speed * 1.9);
+      avoidanceRef.current.add(awayRef.current);
 
-        if (awayRef.current.lengthSq() < 0.001) {
-          awayRef.current.set(1, 0, 0);
-        }
-
-        awayRef.current
-          .normalize()
-          .multiplyScalar(((clearance - distance) / clearance) * motion.speed * 1.9);
-
-        avoidanceRef.current.add(awayRef.current);
-
-        if (distance < obstacle.radius + config.avoidanceRadius * 0.4) {
-          motion.retargetAt = Math.min(motion.retargetAt, elapsed);
-        }
+      if (distance < obstacle.radius + DOLPHIN_MOTION.avoidanceRadius * 0.4) {
+        motion.retargetAt = Math.min(motion.retargetAt, elapsed);
       }
     }
 
     for (const [otherId, otherPosition] of Object.entries(sharedPositionsRef.current)) {
       if (otherId === id) continue;
-
       const distance = horizontalDistance(motion.position, otherPosition);
-      if (distance >= config.socialDistance) continue;
+      if (distance >= DOLPHIN_MOTION.socialDistance) continue;
 
       awayRef.current.copy(motion.position).sub(otherPosition).setY(0);
-      if (awayRef.current.lengthSq() < 0.001) {
-        awayRef.current.set(1, 0, 0);
-      }
-
+      if (awayRef.current.lengthSq() < 0.001) awayRef.current.set(1, 0, 0);
       awayRef.current
         .normalize()
         .multiplyScalar(
-          ((config.socialDistance - distance) / config.socialDistance) * motion.speed * 1.4
+          ((DOLPHIN_MOTION.socialDistance - distance) / DOLPHIN_MOTION.socialDistance) * motion.speed * 1.45
         );
-
       avoidanceRef.current.add(awayRef.current);
     }
 
-    desiredVelocityRef.current.add(avoidanceRef.current);
-    if (desiredVelocityRef.current.lengthSq() > 0.001) {
-      desiredVelocityRef.current.setLength(motion.speed * swimPulse);
+    let steerScale = isSurfaceApproach ? 0.26 : 1;
+    const pod = podRef.current;
+    const isPodMember =
+      isSurfaceApproach &&
+      pod !== null &&
+      pod.joinedIds.includes(id) &&
+      pod.leaderId !== id;
+
+    if (isPodMember && pod !== null) {
+      steerScale = 1.0;
+      awayRef.current.copy(pod.position).sub(motion.position).setY(0);
+      const podDist = awayRef.current.length();
+      if (podDist > 0.001) {
+        const attraction = Math.min(podDist / 80, 1.8) * motion.speed;
+        avoidanceRef.current.add(awayRef.current.normalize().multiplyScalar(attraction));
+      }
     }
 
-    motion.velocity.lerp(desiredVelocityRef.current, Math.min(1, delta * 1.35));
-    motion.position.addScaledVector(motion.velocity, delta);
-    motion.position.y = THREE.MathUtils.clamp(
-      motion.position.y,
-      config.depthRange[0],
-      config.depthRange[1]
-    );
+    steeringRef.current
+      .copy(desiredVelRef.current)
+      .add(avoidanceRef.current)
+      .sub(motion.velocity);
 
-    let surfaceLift = Math.sin(elapsed * config.swaySpeed + seed * 0.00027) * config.swayAmount;
-    let pitchOffset = 0;
-    let rollOffset = 0;
-    let yawOffset = 0;
-    let creatureVisible = true;
+    const maxForce = DOLPHIN_MOTION.maxAcceleration * dt * steerScale;
+    const forceLength = steeringRef.current.length();
+    if (forceLength > maxForce) steeringRef.current.multiplyScalar(maxForce / forceLength);
 
-    const actionProgress = (elapsed - motion.actionAt) / motion.actionDuration;
-    const canPerformAction =
-      nearestObstacleDistance(motion.position) > config.avoidanceRadius + 140;
+    motion.velocity.add(steeringRef.current);
 
-    if (canPerformAction && actionProgress >= 0 && actionProgress <= 1) {
-      const action =
-        config.behavior === "dolphin"
-          ? getDolphinAction(motion.actionStyle, actionProgress)
-          : getWhaleAction(motion.actionStyle, actionProgress);
+    const currentSpeed = motion.velocity.length();
+    const speedCap = motion.speed * pulse * 1.32;
+    if (currentSpeed > speedCap) motion.velocity.multiplyScalar(speedCap / currentSpeed);
 
-      creatureVisible = action.visible;
-      surfaceLift += action.lift;
-      pitchOffset += action.pitch;
-      rollOffset += action.roll;
-      yawOffset += action.yaw;
-    } else if (actionProgress > 1) {
-      motion.actionDuration = randomRange(
+    motion.position.addScaledVector(motion.velocity, dt);
+    motion.position.y = 0;
+
+    if (motion.velocity.lengthSq() > 4) {
+      const targetHeading = Math.atan2(motion.velocity.x, -motion.velocity.z);
+      const headingError = shortAngleDiff(motion.heading, targetHeading);
+      const damping = isSurfaceApproach
+        ? DOLPHIN_MOTION.headingDamping * 4.5
+        : DOLPHIN_MOTION.headingDamping;
+      motion.headingOmega +=
+        (headingError * DOLPHIN_MOTION.turnSpeed * 5.6 - motion.headingOmega * damping) * dt;
+      motion.heading += motion.headingOmega * dt;
+    }
+
+    const bob =
+      Math.sin(elapsed * DOLPHIN_MOTION.swaySpeed * 1.9 + seed * 0.00027) * DOLPHIN_MOTION.swayAmount * 0.55 +
+      Math.sin(elapsed * DOLPHIN_MOTION.swaySpeed * 0.93 + seed * 0.00044) * DOLPHIN_MOTION.swayAmount * 0.22;
+
+    const targetDepth = isSurfaceApproach ? motion.approachDepth : motion.cruiseDepth + bob;
+    const depthLerp = Math.min(1, dt * (isSurfaceApproach ? 5.8 : 2.2));
+    motion.renderDepth = lerp(motion.renderDepth, targetDepth, depthLerp);
+
+    group.position.set(motion.position.x, WATER_SURFACE_Y + motion.renderDepth, motion.position.z);
+    group.rotation.y = motion.heading + MODEL_HEADING_OFFSET;
+
+    const bankTarget = isSurfaceApproach
+      ? 0
+      : THREE.MathUtils.clamp(-motion.velocity.x * DOLPHIN_MOTION.bankFactor, -0.38, 0.38);
+    const pitchTarget = isSurfaceApproach
+      ? 0.24
+      : Math.sin(elapsed * DOLPHIN_MOTION.swaySpeed * 2.35 + seed * 0.00019) * 0.08;
+
+    group.rotation.x = lerpAngle(group.rotation.x, pitchTarget, Math.min(1, dt * 3.4));
+    group.rotation.z = lerpAngle(group.rotation.z, bankTarget, Math.min(1, dt * 3.2));
+
+    commitSharedPosition(sharedPositionsRef, id, motion.position, motion.renderDepth);
+
+    if (
+      motion.phase === "cruise" &&
+      pod &&
+      pod.leaderId !== id &&
+      elapsed <= pod.expiresAt &&
+      !pod.joinedIds.includes(id) &&
+      pod.joinedIds.length < pod.participantGoal &&
+      elapsed >= motion.podCooldownUntil &&
+      horizontalDistance(motion.position, pod.position) <= POD_JOIN_DISTANCE &&
+      nearestObstacleDistance(motion.position) > DOLPHIN_MOTION.avoidanceRadius + 90
+    ) {
+      pod.joinedIds.push(id);
+      motion.podCooldownUntil = elapsed + POD_COOLDOWN;
+      motion.isRacing = pod.isRacing;
+      
+      const delayUntilLaunch = Math.max(0.1, pod.scheduledLaunchAt - elapsed);
+      
+      startJumpSequence(
+        motion,
         random,
-        config.actionDuration[0],
-        config.actionDuration[1]
+        DOLPHIN_MOTION,
+        elapsed,
+        pod.jumpCount,
+        delayUntilLaunch
       );
-      motion.actionAt =
-        elapsed + randomRange(random, config.actionInterval[0], config.actionInterval[1]);
-      motion.actionStyle = randomIndex(random, config.behavior === "dolphin" ? 7 : 6);
-    } else if (config.behavior === "dolphin") {
-      creatureVisible = false;
+      return;
     }
 
-    groupRef.current.visible = creatureVisible;
+    if (motion.phase === "cruise") {
+      if (
+        elapsed >= motion.actionAt &&
+        nearestObstacleDistance(motion.position) > DOLPHIN_MOTION.avoidanceRadius + 140
+      ) {
+        const canLeadPod = elapsed >= motion.podCooldownUntil && (!pod || elapsed > pod.expiresAt);
 
-    groupRef.current.position.copy(motion.position);
+        if (canLeadPod && random() < POD_TRIGGER_CHANCE) {
+          const isRacing = random() < 0.35; // 35% di probabilità di attivare una "gara"
+          const jumpCount = choosePodJumpCount(random, isRacing);
+          const syncLaunchDelay = 1.2; 
+          
+          podRef.current = {
+            leaderId: id,
+            issuedAt: elapsed,
+            expiresAt: elapsed + POD_JOIN_WINDOW,
+            jumpCount,
+            participantGoal: choosePodParticipantGoal(random),
+            joinedIds: [id],
+            position: motion.position.clone(),
+            scheduledLaunchAt: elapsed + syncLaunchDelay,
+            isRacing,
+          };
+          motion.podCooldownUntil = elapsed + POD_COOLDOWN;
+          motion.isRacing = isRacing;
 
-    sideRef.current.set(-motion.velocity.z, 0, -motion.velocity.x);
-    if (sideRef.current.lengthSq() > 0.001) {
-      sideRef.current.normalize().multiplyScalar(stroke * config.swayAmount * 0.6);
-      groupRef.current.position.add(sideRef.current);
+          startJumpSequence(
+            motion,
+            random,
+            DOLPHIN_MOTION,
+            elapsed,
+            jumpCount,
+            syncLaunchDelay
+          );
+        } else {
+          startJumpSequence(
+            motion,
+            random,
+            DOLPHIN_MOTION,
+            elapsed,
+            chooseSoloJumpCount(random),
+            randomRange(random, 0.55, 1.05)
+          );
+        }
+      }
+
+      return;
     }
 
-    groupRef.current.position.y += surfaceLift;
+    const bankAngle = Math.abs(group.rotation.z);
+    const readyToLaunch = Math.abs(motion.renderDepth - motion.launchDepth) < 0.16 && bankAngle < 0.08;
+    const stabilized = Math.abs(motion.headingOmega) < 0.08;
+    const timedOut = elapsed - motion.phaseEnteredAt > 2.6;
 
-    const heading = Math.atan2(motion.velocity.x, -motion.velocity.z);
-    groupRef.current.rotation.y = lerpAngle(
-      groupRef.current.rotation.y,
-      heading + yawOffset,
-      Math.min(1, delta * config.turnSpeed)
-    );
+    if ((elapsed >= motion.launchAt && readyToLaunch && stabilized) || timedOut) {
+      jumpDirRef.current.copy(motion.velocity).setY(0);
+      if (jumpDirRef.current.lengthSq() < 0.001) {
+        jumpDirRef.current.set(Math.sin(motion.heading), 0, -Math.cos(motion.heading));
+      } else {
+        jumpDirRef.current.normalize();
+      }
 
-    const bankTarget = THREE.MathUtils.clamp(
-      -motion.velocity.x * config.bankFactor + rollOffset,
-      -Math.PI,
-      Math.PI
-    );
-    const pitchTarget = THREE.MathUtils.clamp(
-      motion.velocity.y * config.pitchFactor + pitchOffset,
-      -Math.PI,
-      Math.PI
-    );
-
-    groupRef.current.rotation.z = THREE.MathUtils.lerp(
-      groupRef.current.rotation.z,
-      bankTarget,
-      Math.min(1, delta * 2.3)
-    );
-    groupRef.current.rotation.x = THREE.MathUtils.lerp(
-      groupRef.current.rotation.x,
-      pitchTarget,
-      Math.min(1, delta * 2.1)
-    );
-
-    const registry = sharedPositionsRef.current[id] ?? new THREE.Vector3();
-    registry.copy(groupRef.current.position);
-    sharedPositionsRef.current[id] = registry;
+      // Se stanno gareggiando, spingiamo la velocità del salto per farli sembrare più competitivi
+      const speedBoost = motion.isRacing ? 1.35 : 1.08;
+      motion.jumpVelocity.copy(jumpDirRef.current).multiplyScalar(motion.speed * speedBoost);
+      
+      motion.jumpHeading = Math.atan2(motion.jumpVelocity.x, -motion.jumpVelocity.z);
+      motion.heading = motion.jumpHeading;
+      motion.headingOmega = 0;
+      motion.phase = "airborne";
+      motion.phaseEnteredAt = elapsed;
+    }
   });
 
   return (
@@ -832,6 +1085,7 @@ function MarineCreatureEncounter({
 export default function SceneEncounters() {
   const [encounter] = useState<EncounterSet>(() => createEncounterSet());
   const sharedPositionsRef = useRef<Record<string, THREE.Vector3>>({});
+  const podRef = useRef<PodAnnouncement | null>(null);
 
   return (
     <>
@@ -844,38 +1098,9 @@ export default function SceneEncounters() {
       <VolcanoEncounter />
       <RockReefEncounter />
 
-      <MarineCreatureEncounter
-        id="dolphin-a"
-        url="/models/dolphin.glb"
-        seed={encounter.dolphinSeedA}
-        scale={5.95}
-        config={DOLPHIN_MOTION}
-        sharedPositionsRef={sharedPositionsRef}
-      />
-      <MarineCreatureEncounter
-        id="dolphin-b"
-        url="/models/dolphin.glb"
-        seed={encounter.dolphinSeedB}
-        scale={5.88}
-        config={DOLPHIN_MOTION}
-        sharedPositionsRef={sharedPositionsRef}
-      />
-      <MarineCreatureEncounter
-        id="dolphin-c"
-        url="/models/dolphin.glb"
-        seed={encounter.dolphinSeedC}
-        scale={5.82}
-        config={DOLPHIN_MOTION}
-        sharedPositionsRef={sharedPositionsRef}
-      />
-      <MarineCreatureEncounter
-        id="whale"
-        url="/models/blue_whale.glb"
-        seed={encounter.whaleSeed}
-        scale={5.82}
-        config={WHALE_MOTION}
-        sharedPositionsRef={sharedPositionsRef}
-      />
+      <DolphinEncounter id="dolphin-a" seed={encounter.dolphinSeedA} scale={10} sharedPositionsRef={sharedPositionsRef} podRef={podRef} />
+      <DolphinEncounter id="dolphin-b" seed={encounter.dolphinSeedB} scale={10} sharedPositionsRef={sharedPositionsRef} podRef={podRef} />
+      <DolphinEncounter id="dolphin-c" seed={encounter.dolphinSeedC} scale={10} sharedPositionsRef={sharedPositionsRef} podRef={podRef} />
     </>
   );
 }
@@ -887,4 +1112,3 @@ useGLTF.preload("/models/group_of_cliff_2.glb");
 useGLTF.preload("/models/volcano.glb");
 useGLTF.preload("/models/rock_reef.glb");
 useGLTF.preload("/models/dolphin.glb");
-useGLTF.preload("/models/blue_whale.glb");
