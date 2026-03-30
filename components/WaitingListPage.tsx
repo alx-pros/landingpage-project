@@ -7,13 +7,21 @@ import Link from "next/link";
 import SceneTimePanel from "./SceneTimePanel";
 import { Logo } from "@/public/Logo";
 import { AnimatePresence, motion } from "framer-motion";
+import SceneLoadingOverlay from "./SceneLoadingOverlay";
 
 const OceanCanvas = dynamic(() => import("@/components/OceanCavas"), {
   ssr: false,
-  loading: () => <div className="fixed inset-0 bg-ink" />,
+  loading: () => null,
 });
 
 const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+
+interface PixelPoint {
+  x: number;
+  y: number;
+  r: number;
+  color: string;
+}
 
 function getDisplayDate(timeOverrideHour: number | null, baseDate: Date) {
   if (timeOverrideHour === null) {
@@ -45,35 +53,8 @@ function WaitlistForm({
   onSubmit?: (email: string) => void;
   id?: string;
 }) {
-  const [currentPlaceholder, setCurrentPlaceholder] = useState(0);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
-
-  const startAnimation = () => {
-    intervalRef.current = setInterval(() => {
-      setCurrentPlaceholder((prev) => (prev + 1) % placeholder.length);
-    }, 3000);
-  };
-
-  const handleVisibilityChange = () => {
-    if (document.visibilityState !== "visible" && intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    } else if (document.visibilityState === "visible") {
-      startAnimation();
-    }
-  };
-
-  useEffect(() => {
-    startAnimation();
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
-  }, [placeholder]);
-
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const newDataRef = useRef<any[]>([]);
+  const newDataRef = useRef<PixelPoint[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const [value, setValue] = useState("");
   const [animating, setAnimating] = useState(false);
@@ -99,12 +80,12 @@ function WaitlistForm({
 
     const imageData = ctx.getImageData(0, 0, 800, 800);
     const pixelData = imageData.data;
-    const newData: any[] = [];
+    const newData: Array<{ x: number; y: number; color: [number, number, number, number] }> = [];
 
     for (let t = 0; t < 800; t++) {
-      let i = 4 * t * 800;
+      const i = 4 * t * 800;
       for (let n = 0; n < 800; n++) {
-        let e = i + 4 * n;
+        const e = i + 4 * n;
         if (pixelData[e + 3] > 0) {
           newData.push({
             x: n,
@@ -234,14 +215,12 @@ function WaitlistForm({
 }
 
 export default function WaitlistPage() {
-  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
+  const currentYear = new Date().getFullYear();
   const [timeOverrideHour, setTimeOverrideHour] = useState<number | null>(null);
   const [clockNow, setClockNow] = useState(() => new Date());
   const [isMusicPlaying, setIsMusicPlaying] = useState(false);
-
-  useEffect(() => {
-    setCurrentYear(new Date().getFullYear());
-  }, []);
+  const [sceneProgress, setSceneProgress] = useState(0);
+  const [sceneReady, setSceneReady] = useState(false);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -255,7 +234,12 @@ export default function WaitlistPage() {
 
   return (
     <>
-      <OceanCanvas timeOverrideHour={timeOverrideHour} />
+      <SceneLoadingOverlay visible={!sceneReady} progress={sceneProgress} />
+      <OceanCanvas
+        timeOverrideHour={timeOverrideHour}
+        onProgressChange={setSceneProgress}
+        onReadyChange={setSceneReady}
+      />
       <div className="fixed inset-0 z-10 pointer-events-none ocean-veil" />
 
       {/* 2. THE SCROLLABLE CONTENT LAYER */}

@@ -10,11 +10,6 @@ import SceneEncounters from "./SceneEncounters";
 import { getSceneDate, sceneParams } from "./sceneParams";
 import { getSceneSnapshot, type SceneSnapshot, vecFromSpherical } from "./timeUtils";
 
-interface SphericalPoint {
-  elevation: number;
-  azimuth: number;
-}
-
 const SKY_OBJECT_LAYER = 1;
 
 const CONSTELLATION_SETS = [
@@ -388,44 +383,33 @@ function wrapAzimuth(value: number) {
   return ((value % 360) + 360) % 360;
 }
 
-function createCometPaths(count: number) {
-  const paths: Array<{
-    start: SphericalPoint;
-    end: SphericalPoint;
-    duration: number;
-    delay: number;
-    offset: number;
-  }> = [];
-
-  let seed = Math.floor(Math.random() * 4_294_967_295) >>> 0;
-
-  const random = () => {
+function createSeededRandom(seedBase: number) {
+  let seed = seedBase >>> 0 || 1;
+  return () => {
     seed = (seed * 1_664_525 + 1_013_904_223) >>> 0;
     return seed / 4_294_967_296;
   };
+}
 
-  for (let index = 0; index < count; index += 1) {
-    const startAzimuth = random() * 360;
-    const sweep = (26 + random() * 32) * (random() > 0.5 ? 1 : -1);
-    const startElevation = 14 + random() * 24;
-    const endElevation = Math.max(8, startElevation - (14 + random() * 16));
-    const duration = 2.4 + random() * 1.3;
-    const delay = 10 + random() * 0.8;
-    const offset = index * 0.72 + random() * 1.2;
+function createRandomCometPath(random: () => number) {
+  const startAzimuth = random() * 360;
+  const sweep = (18 + random() * 40) * (random() > 0.5 ? 1 : -1);
+  const startElevation = 16 + random() * 26;
+  const endElevation = Math.max(6, startElevation - (10 + random() * 18));
 
-    paths.push({
-      start: { elevation: startElevation, azimuth: startAzimuth },
-      end: {
-        elevation: endElevation,
-        azimuth: wrapAzimuth(startAzimuth + sweep),
-      },
-      duration,
-      delay,
-      offset,
-    });
-  }
+  return {
+    start: vecFromSpherical(startElevation, startAzimuth, new THREE.Vector3()).multiplyScalar(7_080),
+    end: vecFromSpherical(endElevation, wrapAzimuth(startAzimuth + sweep), new THREE.Vector3()).multiplyScalar(7_080),
+    duration: 1.4 + random() * 1.4,
+    delay: 15.8 + random() * 15.1,
+  };
+}
 
-  return paths;
+function createCometSeeds(count: number) {
+  return Array.from({ length: count }, (_, index) => ({
+    seed: Math.floor(Math.random() * 4_294_967_295) >>> 0,
+    offset: index * 0.85 + Math.random() * 1.6,
+  }));
 }
 
 function createStarPositions(count: number, seedBase: number, phiMax = 0.46) {
@@ -816,16 +800,10 @@ function Constellations() {
 }
 
 function Comet({
-  start,
-  end,
-  duration,
-  delay,
+  seed,
   offset,
 }: {
-  start: SphericalPoint;
-  end: SphericalPoint;
-  duration: number;
-  delay: number;
+  seed: number;
   offset: number;
 }) {
   const groupRef = useRef<THREE.Group>(null);
@@ -835,16 +813,15 @@ function Comet({
   const trailAttrRef = useRef<THREE.BufferAttribute>(null);
   const glowTexture = useMemo(() => createStarGlowTexture(), []);
   const trailPositions = useMemo(() => new Float32Array(6), []);
-  const path = useMemo(() => {
-    return {
-      start: vecFromSpherical(start.elevation, start.azimuth, new THREE.Vector3()).multiplyScalar(
-        7_080
-      ),
-      end: vecFromSpherical(end.elevation, end.azimuth, new THREE.Vector3()).multiplyScalar(7_080),
-    };
-  }, [end.azimuth, end.elevation, start.azimuth, start.elevation]);
+  const random = useMemo(() => createSeededRandom(seed), [seed]);
+  const pathRef = useRef<ReturnType<typeof createRandomCometPath> | null>(null);
+  const cycleStartRef = useRef(offset);
   const _headPos = useRef(new THREE.Vector3());
   const _tailPos = useRef(new THREE.Vector3());
+
+  if (pathRef.current === null) {
+    pathRef.current = createRandomCometPath(random);
+  }
 
   useEffect(() => {
     return () => {
@@ -865,15 +842,25 @@ function Comet({
 
     const scene = getSceneSnapshot(getSceneDate(), sceneParams.location);
     const nightVisibility = THREE.MathUtils.clamp(scene.starsOpacity * 1.5, 0, 1);
-    const cycle = duration + delay;
-    const localTime = (state.clock.elapsedTime + offset) % cycle;
+    const path = pathRef.current ?? createRandomCometPath(random);
+    pathRef.current = path;
+    const elapsed = state.clock.elapsedTime;
+    const localTime = elapsed - cycleStartRef.current;
+    const cycle = path.delay + path.duration;
 
-    if (nightVisibility <= 0.05 || localTime > duration) {
+    if (localTime > cycle) {
+      cycleStartRef.current = elapsed;
+      pathRef.current = createRandomCometPath(random);
       groupRef.current.visible = false;
       return;
     }
 
-    const progress = localTime / duration;
+    if (nightVisibility <= 0.05 || localTime < path.delay) {
+      groupRef.current.visible = false;
+      return;
+    }
+
+    const progress = (localTime - path.delay) / path.duration;
     const easedProgress = THREE.MathUtils.smootherstep(progress, 0, 1);
     const tailProgress = Math.max(0, easedProgress - 0.032);
     const fade = 0.8 + Math.sin(progress * Math.PI) * 0.2;
@@ -883,6 +870,7 @@ function Comet({
     headRef.current.position.copy(_headPos.current);
     headRef.current.scale.setScalar(18 + fade * 8);
 
+    const trailPositions = trailAttrRef.current.array as Float32Array;
     trailPositions[0] = _tailPos.current.x;
     trailPositions[1] = _tailPos.current.y;
     trailPositions[2] = _tailPos.current.z;
@@ -931,17 +919,14 @@ function Comet({
 }
 
 function CometField() {
-  const cometPaths = useMemo(() => createCometPaths(8), []);
+  const cometSeeds = useMemo(() => createCometSeeds(8), []);
 
   return (
     <>
-      {cometPaths.map((comet) => (
+      {cometSeeds.map((comet) => (
         <Comet
-          key={`${comet.start.azimuth}-${comet.end.azimuth}`}
-          start={comet.start}
-          end={comet.end}
-          duration={comet.duration}
-          delay={comet.delay}
+          key={comet.seed}
+          seed={comet.seed}
           offset={comet.offset}
         />
       ))}
@@ -1207,7 +1192,7 @@ export default function OceanScene() {
         dampingFactor={0.06}
         rotateSpeed={0.45}
         minPolarAngle={Math.PI * 0.16}
-        maxPolarAngle={Math.PI * 0.49}
+        maxPolarAngle={Math.PI * 0.89}
         target={[0, 8, 0]}
       />
     </>

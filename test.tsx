@@ -127,7 +127,7 @@ const POD_COOLDOWN = 24;
 const DIVE_DURATION_RANGE: [number, number] = [1.15, 1.55];
 
 // FIX: Ripristinato a Math.PI, così il muso punta nella giusta direzione
-const MODEL_HEADING_OFFSET = Math.PI / 2;
+const MODEL_HEADING_OFFSET = Math.PI;
 
 function lerp(a: number, b: number, t: number) {
   return a + (b - a) * t;
@@ -315,7 +315,7 @@ const PROMONTORY_TUNING: MaterialTuning = {
   envMapIntensity: 3,
   roughness: 0,
   metalness: 0,
-  colorBoost: 1.03,
+  colorBoost: 1.01,
   emissiveBoost: 1.02,
 };
 
@@ -323,7 +323,7 @@ const ROCK_REEF_TUNING: MaterialTuning = {
   envMapIntensity: 2.16,
   roughness: 1.92,
   metalness: 0.03,
-  colorBoost: 1.01,
+  colorBoost: 1.05,
   emissiveBoost: 2.04,
 };
 
@@ -331,7 +331,7 @@ const CLIFF_TUNING: MaterialTuning = {
   envMapIntensity: 3,
   roughness: 0.62,
   metalness: 0.03,
-  colorBoost: 1.3,
+  colorBoost: 2,
   emissiveBoost: 1.04,
 };
 
@@ -339,7 +339,7 @@ const CLIFF_GROUP_TUNING_1: MaterialTuning = {
   envMapIntensity: 3,
   roughness: 0.34,
   metalness: 0,
-  colorBoost: 1.5,
+  colorBoost: 4,
   emissiveBoost: 1.04,
 };
 
@@ -347,7 +347,7 @@ const CLIFF_GROUP_TUNING_2: MaterialTuning = {
   envMapIntensity: 3,
   roughness: 0.9,
   metalness: 0,
-  colorBoost: 1.5,
+  colorBoost: 3.5,
   emissiveBoost: 1.04,
 };
 
@@ -355,7 +355,7 @@ const VOLCANO_TUNING: MaterialTuning = {
   envMapIntensity: 1.35,
   roughness: 0.9,
   metalness: 0.03,
-  colorBoost: 1.1,
+  colorBoost: 1.3,
   emissiveBoost: 1.05,
 };
 
@@ -681,10 +681,6 @@ function DolphinEncounter({
   const avoidanceRef = useRef(new THREE.Vector3());
   const awayRef = useRef(new THREE.Vector3());
   const jumpDirRef = useRef(new THREE.Vector3());
-  const raceForwardRef = useRef(new THREE.Vector3());
-  const raceRightRef = useRef(new THREE.Vector3());
-  const raceTargetRef = useRef(new THREE.Vector3());
-  const dayVisibilityRef = useRef(true);
 
   useClipPlayback(model, animations, seed, DOLPHIN_MOTION.animationSpeedRange);
 
@@ -701,36 +697,6 @@ function DolphinEncounter({
     const motion = motionRef.current;
     const elapsed = state.clock.elapsedTime;
     const dt = Math.min(delta, 0.05);
-    const sceneDate = getSceneDate();
-    const encounterHour = sceneDate.getHours() + sceneDate.getMinutes() / 60;
-    const encounterActive = encounterHour >= 5 && encounterHour < 18;
-
-    if (!encounterActive) {
-      dayVisibilityRef.current = false;
-      motion.isRacing = false;
-      motion.raceLeaderId = null;
-      group.visible = false;
-      delete sharedPositionsRef.current[id];
-      if (podRef.current?.leaderId === id) {
-        podRef.current = null;
-      }
-      return;
-    }
-
-    if (!dayVisibilityRef.current) {
-      motion.phase = "cruise";
-      motion.phaseEnteredAt = elapsed;
-      motion.sequenceRemaining = 0;
-      motion.isRacing = false;
-      motion.raceLeaderId = null;
-      motion.headingOmega = 0;
-      motion.cruiseDepth = randomRange(random, DOLPHIN_MOTION.cruiseDepthRange[0], DOLPHIN_MOTION.cruiseDepthRange[1]);
-      motion.renderDepth = motion.cruiseDepth;
-      motion.actionAt = elapsed + randomRange(random, DOLPHIN_MOTION.actionInterval[0], DOLPHIN_MOTION.actionInterval[1]);
-      dayVisibilityRef.current = true;
-    }
-
-    group.visible = true;
 
     if (podRef.current && elapsed > podRef.current.expiresAt) {
       podRef.current = null;
@@ -810,64 +776,32 @@ function DolphinEncounter({
 
     if (motion.isRacing && isSurfaceApproach) {
       bypassStandardSteering = true;
-      const pod = podRef.current;
-      if (pod && motion.raceLeaderId && pod.leaderId === motion.raceLeaderId) {
-        motion.raceHeading = pod.heading;
-        motion.raceSpeed = pod.raceSpeed;
-      }
-
-      raceForwardRef.current.set(Math.sin(motion.raceHeading), 0, -Math.cos(motion.raceHeading));
+      const raceForward = new THREE.Vector3(Math.sin(motion.raceHeading), 0, -Math.cos(motion.raceHeading));
 
       if (motion.raceLeaderId === id) {
-        raceRightRef.current.set(Math.cos(motion.raceHeading), 0, Math.sin(motion.raceHeading));
-
-        let turnDelta = 0;
-        for (const obstacle of CREATURE_OBSTACLES) {
-          awayRef.current.copy(obstacle.position).sub(motion.position).setY(0);
-          const clearance = obstacle.radius + DOLPHIN_MOTION.avoidanceRadius + 60;
-          const lookAhead = clearance * 2.3;
-          const ahead = awayRef.current.dot(raceForwardRef.current);
-          const lateral = awayRef.current.dot(raceRightRef.current);
-
-          if (ahead < 0 || ahead > lookAhead || Math.abs(lateral) > clearance) continue;
-
-          const proximity = 1 - THREE.MathUtils.clamp(ahead / lookAhead, 0, 1);
-          const lateralWeight = 1 - THREE.MathUtils.clamp(Math.abs(lateral) / clearance, 0, 1);
-          const turnDirection = lateral >= 0 ? -1 : 1;
-          turnDelta += turnDirection * proximity * lateralWeight * 0.65;
-        }
-
-        if (Math.abs(turnDelta) > 0.0001) {
-          motion.raceHeading = normalizeAngle(motion.raceHeading + THREE.MathUtils.clamp(turnDelta, -0.085, 0.085));
-          raceForwardRef.current.set(Math.sin(motion.raceHeading), 0, -Math.cos(motion.raceHeading));
-        }
-
+        // IL LEADER: Va perfettamente dritto senza curarsi di ostacoli o altro
         motion.speed = motion.raceSpeed;
         motion.heading = motion.raceHeading;
-        motion.velocity.copy(raceForwardRef.current).multiplyScalar(motion.speed);
+        motion.velocity.copy(raceForward).multiplyScalar(motion.speed);
         motion.position.addScaledVector(motion.velocity, dt);
-
-        if (podRef.current?.leaderId === id) {
-          podRef.current.heading = motion.raceHeading;
-          podRef.current.position.copy(motion.position);
-          podRef.current.raceSpeed = motion.raceSpeed;
-        }
       } else if (motion.raceLeaderId) {
+        // I SEGUACI: Si incollano matematicamente alla loro corsia
         const leaderPos = sharedPositionsRef.current[motion.raceLeaderId];
         if (leaderPos) {
-          motion.raceHeading = pod?.heading ?? motion.raceHeading;
-          raceForwardRef.current.set(Math.sin(motion.raceHeading), 0, -Math.cos(motion.raceHeading));
-          raceRightRef.current.set(Math.cos(motion.raceHeading), 0, Math.sin(motion.raceHeading));
-          raceTargetRef.current.copy(leaderPos).addScaledVector(raceRightRef.current, motion.raceLane * 55);
+          const rightDir = new THREE.Vector3(Math.cos(motion.raceHeading), 0, Math.sin(motion.raceHeading));
+          // Troviamo il punto perfetto: 55 unità a destra o sinistra del leader
+          const idealPos = leaderPos.clone().add(rightDir.multiplyScalar(motion.raceLane * 55));
 
-          motion.position.lerp(raceTargetRef.current, dt * 15);
+          // Snap ultra-rapido alla corsia perfetta
+          motion.position.lerp(idealPos, dt * 15); 
           motion.speed = motion.raceSpeed;
           motion.heading = motion.raceHeading;
-          motion.velocity.copy(raceForwardRef.current).multiplyScalar(motion.speed);
+          motion.velocity.copy(raceForward).multiplyScalar(motion.speed);
         }
       }
       motion.position.y = 0;
 
+      // Resettiamo eventuali oscillazioni
       motion.headingOmega = 0;
       motion.renderDepth = lerp(motion.renderDepth, motion.approachDepth, dt * 5.8);
       
@@ -1086,6 +1020,7 @@ function DolphinEncounter({
       }
 
       if (motion.isRacing) {
+        // Garantisce che il salto avvenga in modo dritto millimetrico per tutti
         jumpDirRef.current.set(Math.sin(motion.raceHeading), 0, -Math.cos(motion.raceHeading));
       }
 
