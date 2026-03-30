@@ -175,13 +175,12 @@ const CONSTELLATION_SETS = [
   },
   {
     stars: [
-      { elevation: 16.7, azimuth: 155.6 },
-      { elevation: 19.2, azimuth: 158.8 },
-      { elevation: 22.3, azimuth: 158.5 },
-      { elevation: 23.8, azimuth: 155.3 },
-      { elevation: 21, azimuth: 150.8 },
+      { elevation: 19, azimuth: 158.8 },
+      { elevation: 22, azimuth: 158.5 },
+      { elevation: 23.6, azimuth: 155.3 },
+      { elevation: 20.7, azimuth: 150.8 },
     ],
-    segments: [[0, 1], [1, 2], [2, 3], [3, 4]],
+    segments: [[0, 1], [1, 2], [2, 3]],
   },
   {
     stars: [

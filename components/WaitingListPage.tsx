@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useState, useId, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import MusicToggle from "./MusicToggle";
 import Link from "next/link";
 import SceneTimePanel from "./SceneTimePanel";
