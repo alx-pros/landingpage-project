@@ -1192,7 +1192,7 @@ export default function OceanScene() {
         dampingFactor={0.06}
         rotateSpeed={0.45}
         minPolarAngle={Math.PI * 0.16}
-        maxPolarAngle={Math.PI * 0.89}
+        maxPolarAngle={Math.PI * 0.525}
         target={[0, 8, 0]}
       />
     </>

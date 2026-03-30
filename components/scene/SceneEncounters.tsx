@@ -315,7 +315,7 @@ const PROMONTORY_TUNING: MaterialTuning = {
   envMapIntensity: 3,
   roughness: 0,
   metalness: 0,
-  colorBoost: 1.03,
+  colorBoost: 1.02,
   emissiveBoost: 1.02,
 };
 
