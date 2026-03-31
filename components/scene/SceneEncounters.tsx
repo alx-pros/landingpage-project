@@ -329,7 +329,7 @@ const PROMONTORY_TUNING: MaterialTuning = {
   envMapIntensity: 3,
   roughness: 0,
   metalness: 0,
-  colorBoost: 2.1,
+  colorBoost: 1.6,
   emissiveBoost: 1.02,
 };
 
@@ -337,7 +337,7 @@ const ROCK_REEF_TUNING: MaterialTuning = {
   envMapIntensity: 2.16,
   roughness: 1.92,
   metalness: 0.03,
-  colorBoost: 2.1,
+  colorBoost: 1.3,
   emissiveBoost: 2.04,
 };
 
@@ -345,7 +345,7 @@ const CLIFF_TUNING: MaterialTuning = {
   envMapIntensity: 3,
   roughness: 0.62,
   metalness: 0.03,
-  colorBoost: 3.1,
+  colorBoost: 2.8,
   emissiveBoost: 1.04,
 };
 
@@ -353,7 +353,7 @@ const CLIFF_GROUP_TUNING_1: MaterialTuning = {
   envMapIntensity: 3,
   roughness: 0.34,
   metalness: 0,
-  colorBoost: 5.5,
+  colorBoost: 5,
   emissiveBoost: 1.04,
 };
 
@@ -369,7 +369,7 @@ const VOLCANO_TUNING: MaterialTuning = {
   envMapIntensity: 1.35,
   roughness: 0.9,
   metalness: 0.03,
-  colorBoost: 3.5,
+  colorBoost: 3,
   emissiveBoost: 1.05,
 };
 
