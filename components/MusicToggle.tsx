@@ -121,7 +121,11 @@ export default function MusicToggle({
   // unMute() is gone — the player is always in an unmuted state (volume
   // controls silence instead), so there is nothing to unlock across the iframe.
   const handleButtonClick = useCallback(() => {
-    if (!isPlaying && playerRef.current && isReady) {
+    if (!isReady || !playerRef.current) {
+      return;
+    }
+
+    if (!isPlaying) {
       playerRef.current.playVideo(); // only gesture-gated call — works on iOS
     }
     onToggle();

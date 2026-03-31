@@ -249,7 +249,9 @@ export default function SceneTimePanel({
         onClick={() => setIsOpen(!isOpen)}
         className="flex h-10 cursor-pointer items-center gap-2 rounded-full border border-[#0d8c6a] bg-[#0BC6B4] hover:bg-[#0BC6B4]/30 px-3 text-sm font-mono tracking-[0.18em] text-white shadow-xl focus-within:ring-3 focus-within:ring-[#0BC6B4] focus-within:border-[#0d8c6a] focus-within:outline-none"
       >
-        <span className="font-bold">{label}</span>
+        <span className="font-bold" suppressHydrationWarning>
+          {label}
+        </span>
         <span
           className={`relative top-[1px] text-[0.7rem] transition-transform ${isOpen ? "rotate-180" : ""}`}
         >

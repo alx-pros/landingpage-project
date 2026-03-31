@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useSyncExternalStore } from "react";
 import MusicToggle from "./MusicToggle";
 import Link from "next/link";
 import SceneTimePanel from "./SceneTimePanel";
@@ -40,6 +40,25 @@ function formatTimeLabel(date: Date) {
     .getMinutes()
     .toString()
     .padStart(2, "0")}`;
+}
+
+const SERVER_CLOCK_SNAPSHOT = new Date(0);
+let currentClockSnapshot = new Date();
+
+function subscribeClock(onStoreChange: () => void) {
+  const intervalId = window.setInterval(() => {
+    currentClockSnapshot = new Date();
+    onStoreChange();
+  }, 1_000);
+  return () => window.clearInterval(intervalId);
+}
+
+function getClientClockSnapshot() {
+  return currentClockSnapshot;
+}
+
+function getServerClockSnapshot() {
+  return SERVER_CLOCK_SNAPSHOT;
 }
 
 function WaitlistForm({
@@ -215,18 +234,14 @@ function WaitlistForm({
 export default function WaitlistPage() {
   const currentYear = new Date().getFullYear();
   const [timeOverrideHour, setTimeOverrideHour] = useState<number | null>(null);
-  const [clockNow, setClockNow] = useState(() => new Date());
+  const clockNow = useSyncExternalStore(
+    subscribeClock,
+    getClientClockSnapshot,
+    getServerClockSnapshot
+  );
   const [isMusicPlaying, setIsMusicPlaying] = useState(false);
   const [sceneProgress, setSceneProgress] = useState(0);
   const [sceneReady, setSceneReady] = useState(false);
-
-  useEffect(() => {
-    const intervalId = window.setInterval(() => {
-      setClockNow(new Date());
-    }, 1_000);
-
-    return () => window.clearInterval(intervalId);
-  }, []);
 
   // FIX: memoize onToggle so MusicToggle receives a stable function reference.
   //

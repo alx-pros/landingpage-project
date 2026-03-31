@@ -35,7 +35,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${libreBaskerville.variable} ${cormorantGaramond.variable}`}>
+    <html lang="en" className={`${libreBaskerville.variable} ${cormorantGaramond.variable}`} suppressHydrationWarning>
       <body className="font-body antialiased">{children}</body>
     </html>
   );
