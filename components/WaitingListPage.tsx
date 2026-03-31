@@ -74,7 +74,6 @@ function WaitlistForm({
     const fontSize = parseFloat(computedStyles.fontSize);
     ctx.font = `${fontSize * 2}px ${computedStyles.fontFamily}`;
 
-    // Draw with the actual text color instead of always white
     ctx.fillStyle = computedStyles.color;
     ctx.fillText(value, 16, 40);
 
@@ -200,7 +199,6 @@ function WaitlistForm({
         className={`w-full h-full bg-transparent pl-4 pr-38 sm:pr-44 text-sm sm:text-base text-white outline-none truncate ${animating && "text-transparent!"}`}
       />
 
-      {/* Static placeholder */}
       <div className="absolute left-4 inset-y-0 flex items-center pointer-events-none">
         {!value && <p className="text-sm sm:text-base text-white/50 truncate">{placeholder}</p>}
       </div>
@@ -230,6 +228,25 @@ export default function WaitlistPage() {
     return () => window.clearInterval(intervalId);
   }, []);
 
+  // FIX: memoize onToggle so MusicToggle receives a stable function reference.
+  //
+  // Without useCallback, every setClockNow tick (every second) re-renders
+  // WaitlistPage and produces a new onToggle arrow function. MusicToggle then
+  // re-renders, and — because onToggle is in handleButtonClick's useCallback
+  // deps — handleButtonClick is also recreated on every tick.
+  //
+  // On mobile this constant churn means the button's onClick is being swapped
+  // out repeatedly. When the user taps, the browser's gesture-activation token
+  // is consumed by React's synthetic event dispatch; if React is mid-reconcile
+  // (replacing the onClick reference), iOS Safari can silently drop the
+  // resulting playVideo() postMessage to the cross-origin iframe.
+  //
+  // A stable onToggle → stable handleButtonClick → the tap always lands on
+  // the same committed handler → playVideo() fires reliably on first touch.
+  const handleMusicToggle = useCallback(() => {
+    setIsMusicPlaying((playing) => !playing);
+  }, []);
+
   const displayedSceneTime = formatTimeLabel(getDisplayDate(timeOverrideHour, clockNow));
 
   return (
@@ -242,8 +259,6 @@ export default function WaitlistPage() {
       />
       <div className="fixed inset-0 z-10 pointer-events-none ocean-veil" />
 
-      {/* 2. THE SCROLLABLE CONTENT LAYER */}
-      {/* This wrapper provides the height and flex layout for the UI */}
       <div className="relative z-20 flex flex-col w-full min-h-screen pointer-events-none">
         {/* NAV */}
         <nav className="relative flex mx-auto justify-between items-center px-5 sm:px-10 py-4 sm:py-8 animate-fade-down w-full min-w-[320px] max-w-[1024px] pointer-events-auto">
@@ -261,7 +276,7 @@ export default function WaitlistPage() {
             />
             <MusicToggle
               isPlaying={isMusicPlaying}
-              onToggle={() => setIsMusicPlaying((playing) => !playing)}
+              onToggle={handleMusicToggle}
             />
           </div>
         </nav>

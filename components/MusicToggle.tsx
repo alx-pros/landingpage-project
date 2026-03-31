@@ -51,10 +51,21 @@ export default function MusicToggle({
           disablekb:   1,
           enablejsapi: 1,
           playsinline: 1,
-          mute:        1, // starts muted — unmuted synchronously in the click handler
+          // No mute:1 here. We use setVolume(0) in onReady instead.
+          // On iOS Safari, unMute() called from JS never unlocks the iframe's
+          // audio context — even inside a gesture handler — because the gesture
+          // token does not cross the cross-origin iframe boundary. Keeping the
+          // player in an unmuted-but-silent state (volume=0) sidesteps this
+          // entirely: playVideo() in the click handler is the only gesture-gated
+          // call we ever need to make.
         },
         events: {
-          onReady: () => setIsReady(true),
+          onReady: (event: any) => {
+            // setVolume does NOT require a gesture token — safe to call here.
+            // The player is now unmuted and silent, ready for playVideo().
+            event.target.setVolume(0);
+            setIsReady(true);
+          },
         },
       });
     };
@@ -72,20 +83,14 @@ export default function MusicToggle({
   }, [videoId]);
 
   // ── Volume fade effect ────────────────────────────────────────────────────
-  //
-  // playVideo(), unMute(), and setVolume(0) all live in the click handler so
-  // they execute synchronously within the browser's gesture-activation token
-  // (required by iOS Safari — the token expires before any async effect runs).
-  //
-  // This effect only manages the fade interval, which has no gesture requirement.
   useEffect(() => {
     if (!isReady || !playerRef.current) return;
 
     clearFade();
 
     if (isPlaying) {
-      // Player is already playing, unmuted, and at volume 0 (set in click handler).
-      // Just run the fade-in interval.
+      // Player is already playing at volume 0 (started in click handler).
+      // Fade volume up — no gesture token needed for setVolume().
       let vol = 0;
       fadeIntervalRef.current = setInterval(() => {
         vol = Math.min(vol + 2, 100);
@@ -93,7 +98,7 @@ export default function MusicToggle({
         if (vol >= 100) clearFade();
       }, 30);
     } else {
-      // Fade out then pause.
+      // Fade out, then pause and reset volume to 0 for next play.
       let vol = playerRef.current.getVolume() as number;
       fadeIntervalRef.current = setInterval(() => {
         vol = Math.max(vol - 4, 0);
@@ -101,7 +106,8 @@ export default function MusicToggle({
         if (vol <= 0) {
           clearFade();
           playerRef.current?.pauseVideo();
-          playerRef.current?.mute(); // re-mute so next playVideo() starts silent
+          // Reset to silent so next playVideo() starts at 0 before fading in.
+          playerRef.current?.setVolume(0);
         }
       }, 30);
     }
@@ -111,18 +117,14 @@ export default function MusicToggle({
 
   // ── Click handler ─────────────────────────────────────────────────────────
   //
-  // iOS Safari requires playVideo(), unMute(), and setVolume() to all be called
-  // synchronously inside the gesture handler. The audio context unlock token
-  // expires after the event handler returns — any async path (useEffect,
-  // setTimeout, Promise) is too late, causing the first tap to be silently
-  // ignored and requiring a second tap to actually produce sound.
+  // playVideo() is the only call that requires a gesture token.
+  // unMute() is gone — the player is always in an unmuted state (volume
+  // controls silence instead), so there is nothing to unlock across the iframe.
   const handleButtonClick = useCallback(() => {
     if (!isPlaying && playerRef.current && isReady) {
-      playerRef.current.playVideo();  // must be synchronous — gesture required
-      playerRef.current.unMute();     // must be synchronous — gesture required on iOS
-      playerRef.current.setVolume(0); // start at 0 so the effect fades in cleanly
+      playerRef.current.playVideo(); // only gesture-gated call — works on iOS
     }
-    onToggle(); // flips isPlaying → triggers the fade-in interval in the effect
+    onToggle();
   }, [isPlaying, isReady, onToggle]);
 
   return (
