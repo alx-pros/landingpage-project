@@ -407,8 +407,8 @@ function createRandomCometPath(random: () => number) {
 
 function createCometSeeds(count: number) {
   return Array.from({ length: count }, (_, index) => ({
-    seed: Math.floor(Math.random() * 4_294_967_295) >>> 0,
-    offset: index * 0.85 + Math.random() * 1.6,
+    seed: ((index + 1) * 0x9e3779b9) >>> 0,
+    offset: index * 0.85 + (((index * 37) % 100) / 100) * 1.6,
   }));
 }
 

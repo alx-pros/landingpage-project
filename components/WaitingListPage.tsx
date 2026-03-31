@@ -246,7 +246,7 @@ export default function WaitlistPage() {
       {/* This wrapper provides the height and flex layout for the UI */}
       <div className="relative z-20 flex flex-col w-full min-h-screen pointer-events-none">
         {/* NAV */}
-        <nav className="relative flex mx-auto justify-between items-center px-5 sm:px-10 py-8 animate-fade-down w-full min-w-[320px] max-w-[1024px] pointer-events-auto">
+        <nav className="relative flex mx-auto justify-between items-center px-5 sm:px-10 py-4 sm:py-8 animate-fade-down w-full min-w-[320px] max-w-[1024px] pointer-events-auto">
           <span className="font-display text-[0.92rem] font-bold tracking-[0.28em] uppercase text-[#0BC6B4] text-ocean">
             <div className="flex items-center justify-center gap-1 sm:gap-2">
               <Logo />
@@ -267,7 +267,7 @@ export default function WaitlistPage() {
         </nav>
 
         {/* MAIN */}
-        <main className="relative flex-1 flex mx-auto flex-col items-center justify-center px-6 py-5 sm:py-10 text-center pointer-events-none w-full min-w-[320px] max-w-[1024px]">
+        <main className="relative flex-1 flex mx-auto flex-col items-center justify-center px-6 py-2 sm:py-10 text-center pointer-events-none w-full min-w-[320px] max-w-[1024px]">
           <AnimatePresence>
             {!isMusicPlaying && (
               <motion.div
@@ -278,13 +278,13 @@ export default function WaitlistPage() {
                 transition={{ duration: 0.45, ease: "easeInOut" }}
                 className="flex flex-col items-center"
               >
-                <div className="inline-flex items-center gap-2.5 mb-6 animate-fade-up [animation-delay:350ms] pointer-events-auto">
+                <div className="inline-flex items-center gap-2.5 mb-3 sm:mb-6 animate-fade-up [animation-delay:350ms] pointer-events-auto">
                   <span className="w-1.5 h-1.5 rounded-full bg-[#0BC6B4] glow-dot animate-pulse-dot" />
                   <span className="font-body text-[0.67rem] tracking-[0.32em] uppercase text-[#0BC6B4] text-ocean">
                     Early access open
                   </span>
                 </div>
-                <h1 className="font-display text-[clamp(2.5rem,6.5vw,4.2rem)] font-normal leading-[1.07] tracking-tight mb-5 max-w-2xl text-ocean animate-fade-up [animation-delay:500ms]">
+                <h1 className="font-display text-[clamp(2.5rem,6.5vw,4.2rem)] font-normal leading-[1.07] tracking-tight mb-2 sm:mb-5 max-w-2xl text-ocean animate-fade-up [animation-delay:500ms]">
                   The future of <br />
                   <em className="text-[#0BC6B4] italic">Deep Focus</em>
                   <br />
@@ -292,14 +292,14 @@ export default function WaitlistPage() {
                 </h1>
                 <label
                   htmlFor="email"
-                  className="font-body text-[1.12rem] font-light leading-relaxed text-white/55 max-w-sm mb-9 text-ocean animate-fade-up [animation-delay:650ms]"
+                  className="font-body text-[1.12rem] font-light leading-relaxed text-white/55 max-w-sm mb-5 sm:mb-9 text-ocean animate-fade-up [animation-delay:650ms]"
                 >
                   A focused workspace for makers, writers, and builders who crave clarity. Built on
                   calm. <span className="whitespace-nowrap">Launching soon.</span>
                 </label>
                 <div className="w-full max-w-md pointer-events-auto animate-rise-in [animation-delay:800ms]">
                   <WaitlistForm placeholder="your@email.com" className="w-full" id="email" />
-                  <p className="mt-4 text-[0.68rem] tracking-[0.1em] uppercase text-white/20 text-ocean">
+                  <p className="mt-2 sm:mt-4 text-[0.68rem] tracking-[0.1em] uppercase text-white/20 text-ocean">
                     No spam — just one note when we open{" "}
                     <span className="whitespace-nowrap">the hatch</span>.
                   </p>
@@ -310,7 +310,7 @@ export default function WaitlistPage() {
         </main>
 
         {/* FOOTER */}
-        <footer className="relative flex mx-auto flex-col sm:flex-row justify-between items-center px-5 sm:px-10 py-8 animate-fade-down w-full min-w-[320px] max-w-[1024px] pointer-events-auto">
+        <footer className="relative flex mx-auto flex-col sm:flex-row justify-between items-center px-5 sm:px-10 py-4 sm:py-8 animate-fade-down w-full min-w-[320px] max-w-[1024px] pointer-events-auto">
           <div className="flex flex-col sm:flex-row w-full items-center sm:justify-between gap-2">
             <p className="text-left text-sm leading-normal text-white">
               © {currentYear} DeepWave. All rights reserved.

@@ -230,6 +230,7 @@ export default function SceneTimePanel({
     if (!isOpen) return;
 
     const handleScroll = (event: Event) => {
+      if (window.innerWidth < 640) return;
       if (portalRef.current && portalRef.current.contains(event.target as Node)) return;
       setIsOpen(false);
     };
