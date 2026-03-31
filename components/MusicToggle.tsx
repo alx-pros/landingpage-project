@@ -1,4 +1,3 @@
-// MusicToggle.tsx
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
@@ -18,9 +17,8 @@ export default function MusicToggle({
   isPlaying: boolean;
   onToggle: () => void;
 }) {
-  const playerRef        = useRef<any>(null);
-  const fadeIntervalRef  = useRef<NodeJS.Timeout | null>(null);
-  const pendingPlayRef   = useRef(false); // queued play before player is ready
+  const playerRef       = useRef<any>(null);
+  const fadeIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [isReady, setIsReady] = useState(false);
 
   const videoId = useMemo(() => {
@@ -40,7 +38,7 @@ export default function MusicToggle({
     }
   }, []);
 
-  // ── Initialize player once on mount ───────────────────────────────────────
+  // ── Initialize YouTube player ─────────────────────────────────────────────
   useEffect(() => {
     if (!videoId || typeof window === "undefined") return;
 
@@ -48,20 +46,15 @@ export default function MusicToggle({
       playerRef.current = new window.YT.Player("youtube-player", {
         videoId,
         playerVars: {
-          autoplay:   0,
-          controls:   0,
-          disablekb:  1,
+          autoplay:    0,
+          controls:    0,
+          disablekb:   1,
           enablejsapi: 1,
           playsinline: 1,
-          mute:       1,
+          mute:        1, // starts muted — unmuted synchronously in the click handler
         },
         events: {
-          onReady: () => {
-            setIsReady(true);
-            // NOTE: we do NOT call playVideo() here — no user gesture context.
-            // If the user already clicked, they'll need one more click, but
-            // in practice the player is ready well before the user first clicks.
-          },
+          onReady: () => setIsReady(true),
         },
       });
     };
@@ -78,20 +71,21 @@ export default function MusicToggle({
     }
   }, [videoId]);
 
-  // ── Fade-only effect (no playVideo / pauseVideo calls here) ───────────────
+  // ── Volume fade effect ────────────────────────────────────────────────────
   //
-  // playVideo() MUST be called synchronously inside a user-gesture handler on
-  // mobile. useEffect fires after the render, outside the gesture context, so
-  // the browser silently blocks it. This effect handles only the volume fade;
-  // the actual play/pause calls live in handleButtonClick below.
+  // playVideo(), unMute(), and setVolume(0) all live in the click handler so
+  // they execute synchronously within the browser's gesture-activation token
+  // (required by iOS Safari — the token expires before any async effect runs).
+  //
+  // This effect only manages the fade interval, which has no gesture requirement.
   useEffect(() => {
     if (!isReady || !playerRef.current) return;
 
     clearFade();
 
     if (isPlaying) {
-      // Fade in from 0
-      playerRef.current.setVolume(0);
+      // Player is already playing, unmuted, and at volume 0 (set in click handler).
+      // Just run the fade-in interval.
       let vol = 0;
       fadeIntervalRef.current = setInterval(() => {
         vol = Math.min(vol + 2, 100);
@@ -99,7 +93,7 @@ export default function MusicToggle({
         if (vol >= 100) clearFade();
       }, 30);
     } else {
-      // Fade out then pause
+      // Fade out then pause.
       let vol = playerRef.current.getVolume() as number;
       fadeIntervalRef.current = setInterval(() => {
         vol = Math.max(vol - 4, 0);
@@ -107,6 +101,7 @@ export default function MusicToggle({
         if (vol <= 0) {
           clearFade();
           playerRef.current?.pauseVideo();
+          playerRef.current?.mute(); // re-mute so next playVideo() starts silent
         }
       }, 30);
     }
@@ -114,24 +109,20 @@ export default function MusicToggle({
     return clearFade;
   }, [isPlaying, isReady, clearFade]);
 
-  // ── Button handler — play MUST be triggered here for mobile gesture ────────
+  // ── Click handler ─────────────────────────────────────────────────────────
+  //
+  // iOS Safari requires playVideo(), unMute(), and setVolume() to all be called
+  // synchronously inside the gesture handler. The audio context unlock token
+  // expires after the event handler returns — any async path (useEffect,
+  // setTimeout, Promise) is too late, causing the first tap to be silently
+  // ignored and requiring a second tap to actually produce sound.
   const handleButtonClick = useCallback(() => {
-    const nextPlaying = !isPlaying;
-
-    if (nextPlaying) {
-      if (playerRef.current && isReady) {
-        // Synchronous call inside gesture handler — mobile browsers allow this
-        playerRef.current.unMute();
-        playerRef.current.setVolume(0);
-        playerRef.current.playVideo();
-      } else {
-        // Player not ready yet; flag so we can remind the user or retry
-        pendingPlayRef.current = true;
-      }
+    if (!isPlaying && playerRef.current && isReady) {
+      playerRef.current.playVideo();  // must be synchronous — gesture required
+      playerRef.current.unMute();     // must be synchronous — gesture required on iOS
+      playerRef.current.setVolume(0); // start at 0 so the effect fades in cleanly
     }
-    // pause is handled by the fade effect via the isPlaying state change
-
-    onToggle();
+    onToggle(); // flips isPlaying → triggers the fade-in interval in the effect
   }, [isPlaying, isReady, onToggle]);
 
   return (
@@ -147,14 +138,14 @@ export default function MusicToggle({
               key={i}
               className="block w-[1px] rounded-full bg-white transition-all duration-500"
               style={{
-                height:                 isPlaying ? `${height}px` : "3px",
-                opacity:                isPlaying ? 1 : 0.6,
-                transformOrigin:        "center",
-                animationName:          isPlaying ? "waveform" : "none",
-                animationDuration:      `${0.8 + i * 0.1}s`,
+                height:                  isPlaying ? `${height}px` : "3px",
+                opacity:                 isPlaying ? 1 : 0.6,
+                transformOrigin:         "center",
+                animationName:           isPlaying ? "waveform" : "none",
+                animationDuration:       `${0.8 + i * 0.1}s`,
                 animationTimingFunction: "linear",
                 animationIterationCount: "infinite",
-                animationDelay:         `${i * 0.15}s`,
+                animationDelay:          `${i * 0.15}s`,
               }}
             />
           ))}
